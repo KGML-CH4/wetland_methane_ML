@@ -19,4 +19,9 @@ Required inputs:
 - wetland_classification.txt                                                                                                   
 - preprocessed_sim.sav
 
+## training scripts
+example command:
+```
+python train.py <working_dir> <test_site_index> <rep>
+```
 
