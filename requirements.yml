@@ -1,0 +1,11 @@
+name: wmml
+channels:
+  - pytorch
+  - nvidia
+dependencies:
+  - python=3.12.7
+  - pytorch=2.5.1
+  - pytorch-cuda=11.8
+  - numpy
+  - matplotlib
+  - netCDF4

@@ -8,7 +8,7 @@ Project estimating wetland methane emissions using ML and transfer learning.
 ```
 conda create --name wmml python=3.12.7
 conda install mamba -c conda-forge
-mamba install -f /requirements.yml
+mamba install -f requirements.yml
 ```
 
 ## Container
