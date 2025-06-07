@@ -11,6 +11,13 @@ conda install mamba -c conda-forge
 mamba install -f /requirements.yml
 ```
 
+## Container
+Alternatively, we provide an Apptainer image including the torch and cuda software needed to run the training scripts: zenodo.org/records/15611626.
+Example usage:
+```
+apptainer exec --nv wmml.sif python <training_script>
+```
+
 ## preprocessing_FLUXNET
 
 Required inputs:                                                                                                               
