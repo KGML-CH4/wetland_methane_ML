@@ -13,9 +13,9 @@ mamba install -f /requirements.yml
 
 ## Container
 Alternatively, we provide an Apptainer image including the torch and cuda software needed to run the training scripts: zenodo.org/records/15611626.
-Example usage:
+Usage:
 ```
-apptainer exec --nv wmml.sif python <training_script>
+apptainer exec --nv --bind </host/path/>:</container/path/> wmml.sif python <training_script>
 ```
 
 ## preprocessing_FLUXNET
@@ -27,7 +27,7 @@ Required inputs:
 - preprocessed_sim.sav
 
 ## training scripts
-example command:
+Usage:
 ```
 python train.py <working_dir> <test_site_index> <rep>
 ```
