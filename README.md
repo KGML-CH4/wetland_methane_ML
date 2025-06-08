@@ -12,7 +12,7 @@ mamba install -f requirements.yml
 ```
 
 ## Container
-Alternatively, we provide an Apptainer image including the torch and cuda software needed to run the training scripts: zenodo.org/records/15611626.
+Alternatively, we provide an Apptainer image including the torch and cuda software for training ML models: zenodo.org/records/15611626.
 Usage:
 ```
 apptainer exec --nv --bind </host/path/>:</container/path/> wmml.sif python <training_script>
@@ -20,7 +20,7 @@ apptainer exec --nv --bind </host/path/>:</container/path/> wmml.sif python <tra
 
 ## preprocessing_FLUXNET
 
-Required inputs:                                                                                                               
+Inputs required in the specified working/data directoy.
 - half hourly fluxnet data files                                                                                               
 - metadata (reformatted)                                                                                                       
 - wetland_classification.txt                                                                                                   

@@ -22,7 +22,7 @@ test_ind = int(sys.argv[2])
 rep = int(sys.argv[3])
 
 finetune_path = wd + "Out/finetune_baselineML_" + str(test_ind) + "_" + str(rep) + ".sav"
-path_out = wd + '/Out/output_baseline_ML_' + str(test_ind) + "_" + str(rep) + ".txt"
+#path_out = wd + '/Out/output_baseline_ML_' + str(test_ind) + "_" + str(rep) + ".txt"
 
 sys.stderr.write("using working dir:" + wd + "\n")
 
@@ -401,11 +401,15 @@ with torch.no_grad():
     print(loss_test, flush=True)
 
     # write
-    #Y_test_pred = list(Y_test_pred.flatten().numpy())
-    fp = path_out + str(test_ind) + "_rep_" + str(rep) + '.txt'
-    print(path_out)
-    with open(path_out, "w") as outfile:
-        for window in range(Y_test_pred.shape[0]):
-            outline = list(Y_test_pred[window,:,0].numpy())
-            outline = "\t".join(list(map(str, outline)))
-            outfile.write(outline + "\n")
+    # fp = path_out + str(test_ind) + "_rep_" + str(rep) + '.txt'
+    # print(path_out)
+    # with open(path_out, "w") as outfile:
+    #     for window in range(Y_test_pred.shape[0]):
+    #         outline = list(Y_test_pred[window,:,0].numpy())
+    #         outline = "\t".join(list(map(str, outline)))
+    #         outfile.write(outline + "\n")
+    for window in range(Y_test_pred.shape[0]):         
+        outline = list(Y_test_pred[window,:,0].numpy())
+        outline = "\t".join(list(map(str, outline)))   
+        print(outline)
+        
