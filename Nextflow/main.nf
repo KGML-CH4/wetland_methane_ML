@@ -1,3 +1,7 @@
+params.each { k, v -> 
+    println "- $k = $v"
+}
+println "=============================\n"
 
 process Train_Model {
     publishDir "results/"
