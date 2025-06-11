@@ -26,83 +26,83 @@ days_per_month = config.days_per_month
 
 
 ### combine fluxnet data
-combined_fluxnet_fp = wd + "/Out/fluxnet_emissions_HH.csv"
-if os.path.exists(combined_fluxnet_fp) is False:
+if not os.path.exists("Out/"):
+    os.mkdir("Out/")
 
-    # read filelist
-    sys.stderr.write("reading filelist\n")
-    filelist = []
-    fp = wd + "/Data/FLUXNET_data/"
-    for dirpath, dirnames, filenames in os.walk(fp):
-        for f in filenames:
-           if f[0:4] == "FLX_" and f[-8:] == "_1-1.csv" and "_FLUXNET-CH4_HH_" in f:
-               filelist.append(dirpath + "/" + f)
+# read filelist
+sys.stderr.write("reading filelist\n")
+filelist = []
+fp = wd + "/Data/"
+for dirpath, dirnames, filenames in os.walk(fp):
+    for f in filenames:
+        if f[0:4] == "FLX_" and f[-8:] == "_1-1.csv" and "_FLUXNET-CH4_HH_" in f:
+            filelist.append(dirpath + "/" + f)
 
-    # read site metadata
-    sys.stderr.write("reading site metadata\n")
-    sites = {}
-    fp = wd + "/Data/FLUXNET_data/FLX_AA-Flx_CH4-META_20201112135337801132_reformatted.csv"
-    with open(fp) as infile:
-        meta_header = infile.readline().strip().split(",")
-        meta_header[0] = "SITE_ID"  # (addressing a weird formatting thing)
-        #del meta_header[4]  # removing "UPLAND_CLASS" for now, lots of missing data  
+# read site metadata
+sys.stderr.write("reading site metadata\n")
+sites = {}
+fp = wd + "/Data/FLX_AA-Flx_CH4-META_20201112135337801132_reformatted.csv"
+with open(fp) as infile:
+    meta_header = infile.readline().strip().split(",")
+    meta_header[0] = "SITE_ID"  # (addressing a weird formatting thing)
+    #del meta_header[4]  # removing "UPLAND_CLASS" for now, lots of missing data  
+    for line in infile:
+        newline = line.strip().split(",")
+        siteid = newline[0]
+        #del newline[4]
+        sites[siteid] = newline
+
+# explore header information
+sys.stderr.write("exploring header info\n")
+header_info = {}
+for f in filelist:
+    with open(f) as infile:
+        header = infile.readline().strip().split(",")
+        for thing in header:
+            if thing not in header_info:
+                header_info[thing] = 0
+            header_info[thing] += 1
+keep_fields = {}  # for now usig vars shared across all sites/files
+for thing in header_info:
+    if header_info[thing] == len(filelist):
+        keep_fields[thing] = 0
+
+# loop through and get data (not memory efficient; but not memory limited, can run on macbook with other apps closed)
+data = []
+sys.stderr.write("looping through files and collecting data\n")
+for f in filelist:
+    sys.stderr.write("\t" + f + "\n")
+    siteid = f.split("/")[-1].split("_")[1]
+    keep_indices = []
+    current_data = []
+    with open(f) as infile:
+        header = infile.readline().strip().split(",")
+        for i in range(len(header)):
+            if header[i] in keep_fields:
+                keep_indices.append(i)
         for line in infile:
             newline = line.strip().split(",")
-            siteid = newline[0]
-            #del newline[4]
-            sites[siteid] = newline
+            newline = np.array(list(map(float, newline)))
+            newline = newline[keep_indices]
+            newline = np.concatenate([np.array(sites[siteid]), newline])
+            data.append(newline)
+#
+data = np.array(data)
 
-    # explore header information
-    sys.stderr.write("exploring header info\n")
-    header_info = {}
-    for f in filelist:
-        with open(f) as infile:
-            header = infile.readline().strip().split(",")
-            for thing in header:
-                if thing not in header_info:
-                    header_info[thing] = 0
-                header_info[thing] += 1
-    keep_fields = {}  # for now usig vars shared across all sites/files
-    for thing in header_info:
-        if header_info[thing] == len(filelist):
-            keep_fields[thing] = 0
-
-    # loop through and get data (not memory efficient; but not memory limited, can run on macbook with other apps closed)
-    data = []
-    sys.stderr.write("looping through files and collecting data\n")
-    for f in filelist:
-        sys.stderr.write("\t" + f + "\n")
-        siteid = f.split("/")[-1].split("_")[1]
-        keep_indices = []
-        current_data = []
-        with open(f) as infile:
-            header = infile.readline().strip().split(",")
-            for i in range(len(header)):
-                if header[i] in keep_fields:
-                    keep_indices.append(i)
-            for line in infile:
-                newline = line.strip().split(",")
-                newline = np.array(list(map(float, newline)))
-                newline = newline[keep_indices]
-                newline = np.concatenate([np.array(sites[siteid]), newline])
-                data.append(newline)
-    #
-    data = np.array(data)
-
-    # write
-    sys.stderr.write("writing output\n")
-    fp = wd + "/Out/fluxnet_emissions_HH.csv"
-    header = np.array(header)[keep_indices]
-    header = np.array(meta_header + list(header))
-    with open(fp, "w") as outfile:
-        outfile.write(",".join(header) + "\n")
-        for line in data:
-            outfile.write(",".join(line) + "\n")
+# write
+sys.stderr.write("writing output\n")
+fp = wd + "/Out/fluxnet_emissions_HH.csv"
+header = np.array(header)[keep_indices]
+header = np.array(meta_header + list(header))
+with open(fp, "w") as outfile:
+    outfile.write(",".join(header) + "\n")
+    for line in data:
+        outfile.write(",".join(line) + "\n")
 
 ### read fluxnet data
 X_obs = []
 counter = 0
-with open(combined_fluxnet_fp) as infile:  #3,096,831 lines
+with open(fp) as infile:  #3,096,831 lines
     X_vars_obs = np.array(infile.readline().strip().split(","))
     print(X_vars_obs)
     for line in infile:
@@ -139,53 +139,16 @@ print(set(list(X_obs[:,3])))
 # 'FCH4_F_ANNOPTLM', 'FCH4_F_RANDUNC', 'FCH4_F_ANNOPTLM_UNC', 'FCH4_F_ANNOPTLM_QC']
 
 keepers = []
-keepers.append(0)  # SITE_ID
-keepers.append(1)  # lat 
-keepers.append(2)  # long
-keepers.append(3)  # site_classification
-#keepers.append(4)  # upland class
-#keepers.append(5)  # IGBP
-
-#keepers.append(6)  # KOPPEN
-#keepers.append(7)  # MOSS_Brown
-#keepers.append(8)  # MOSS_Sphagnum
-#keepers.append(9)  # AERENCHYMATOUS
-#keepers.append(10)  # ERI_SHRUB
-#keepers.append(11)  # TREE
-
-#keepers.append(12)  # DOM_VEG (not sure if we know this info for new grid cells)
-keepers.append(13)  # TIMESTAMP_START
-#keepers.append(14)  # TIMESTAMP_END
-#keepers.append(15)  # NEE. net ecosystem exchange (CO2)- using gap-filled version 
-#keepers.append(16)  # H.  Sensible heat flux — using gap-filled version 
-#keepers.append(17)  # LE. latent heat flux — using gap-filled version 
-keepers.append(18)  # FCH4. methane flux (raw)
-#keepers.append(19)  # USTAR. Friction velocity
-#keepers.append(20)  # SW_IN. Shortwave radiation, incoming
-#keepers.append(21)  # GPP_DT. Gross Primary Productivity (dont know what the "_DT" is)
-
-#keepers.append(22)  # RECO_DT. Ecosystem Respiration (dont know what the "_DT" is)
-#keepers.append(23)  # WS. wind speed — using gap-filled
-#keepers.append(24)  # NEE_F. net ecosystem exchange (CO2)
-#keepers.append(25)  # H_F.  Sensible heat flux
-keepers.append(26)  # LE_F. latent heat flux
-keepers.append(27)  # FCH4_F. response/target variable, gap-filled
-#keepers.append(28)  # SW_IN_F. Shortwave radiation, incoming
-#keepers.append(29)  # LW_IN_F. Longwave radiation, incoming
-# keepers.append(30)  # VPD_F. Vapor Pressure Deficit
-
-#keepers.append(31)  # PA_F. atmospheric pressure
-keepers.append(32)  # TA_F. air temp  "Gaps in meteorological variables including air temperature (TA), were filled with ERA-Interim (ERA-I) reanalysis data (Vuichard and Papale 2015)"
-# keepers.append(33)  # P_F. Precipitation
-#keepers.append(34)  # WS_F. wind speed
-#keepers.append(35)  # LE_F_ANNOPTLM - neural net filled
-# keepers.append(36)  # NEE_F_ANNOPTLM
-
-keepers.append(37)  # FCH4_F_ANNOPTLM
-# keepers.append(38)  # FCH4_F_RANDUNC
-# keepers.append(39)  # FCH4_F_ANNOPTLM_UNC
-# keepers.append(40)  # FCH4_F_ANNOPTLM_QC
-
+keepers.append(list(X_vars_obs).index("SITE_ID"))  
+keepers.append(list(X_vars_obs).index("LAT"))  
+keepers.append(list(X_vars_obs).index("LON"))  
+keepers.append(list(X_vars_obs).index("SITE_CLASSIFICATION"))
+keepers.append(list(X_vars_obs).index("TIMESTAMP_START"))
+keepers.append(list(X_vars_obs).index("FCH4"))
+keepers.append(list(X_vars_obs).index("LE_F"))
+keepers.append(list(X_vars_obs).index("FCH4_F"))
+keepers.append(list(X_vars_obs).index("TA_F"))
+keepers.append(list(X_vars_obs).index("FCH4_F_ANNOPTLM"))
 print(keepers)
 X_vars_obs = X_vars_obs[keepers]
 X_obs = X_obs[:, keepers]
@@ -590,110 +553,110 @@ print(X_vars_obs)
 
 
 
-# load simulated data
-fp = wd + "Out/preprocessed_sim.sav"
-data0 = torch.load(fp, weights_only=False)
-Y_sim = torch.tensor(data0['Y'])
-Y_stats_sim = torch.tensor(data0['Y_stats'])
-Z_sim = data0['Z']
-Z_vars_sim = data0['Z_vars']
-# Y_stats = data0['Y_stats']
-print(Y_sim.shape, flush=True)
-print(Z_sim.shape, flush=True)
-print(Z_vars_sim, flush=True)
+# # load simulated data
+# fp = wd + "Out/preprocessed_sim.sav"
+# data0 = torch.load(fp, weights_only=False)
+# Y_sim = torch.tensor(data0['Y'])
+# Y_stats_sim = torch.tensor(data0['Y_stats'])
+# Z_sim = data0['Z']
+# Z_vars_sim = data0['Z_vars']
+# # Y_stats = data0['Y_stats']
+# print(Y_sim.shape, flush=True)
+# print(Z_sim.shape, flush=True)
+# print(Z_vars_sim, flush=True)
 
-# convert -9999 to nan
-print(torch.sum(np.isnan(Y_sim)))
-print(len(np.where(Y_sim == -9999)[0]))
-Y_sim[np.where(Y_sim==-9999)] = np.nan
-print(torch.sum(np.isnan(Y_sim)))
-print(len(np.where(Y_sim == -9999)[0]))
-
-
+# # convert -9999 to nan
+# print(torch.sum(np.isnan(Y_sim)))
+# print(len(np.where(Y_sim == -9999)[0]))
+# Y_sim[np.where(Y_sim==-9999)] = np.nan
+# print(torch.sum(np.isnan(Y_sim)))
+# print(len(np.where(Y_sim == -9999)[0]))
 
 
-### align by lat long
-print(X_obs.shape)
-num_sites = Y_obs.shape[0]
-num_timepoints = Y_obs.shape[1]
-hits = []
-locs = []
-new_X = []
-new_Y = []
-new_Z = []
-new_TEM = []
 
-# prep sim coords
-lat_ind = list(Z_vars_sim).index("lat")
-long_ind = list(Z_vars_sim).index("long")  
-lat_sim = np.nanmax(Z_sim[:,:,lat_ind], axis = 1)
-long_sim = np.nanmax(Z_sim[:,:,long_ind], axis =1)
-coords_sim = [utils.coords2index(lon, lat) for lon, lat in zip(long_sim, lat_sim)]
-coords_sim = np.array(coords_sim)
-long_sim,lat_sim = coords_sim[:,0],coords_sim[:,1]
 
-# loop through obs sites
-for site in range(num_sites):
-    print(site)
-    lat_ind = list(Z_vars_obs).index("LAT")
-    long_ind = list(Z_vars_obs).index("LON")
-    lat_obs = np.nanmax(Z_obs[site,:,lat_ind])
-    long_obs = np.nanmax(Z_obs[site,:,long_ind])
-    long_obs,lat_obs = utils.coords2index(long_obs, lat_obs)
+# ### align by lat long
+# print(X_obs.shape)
+# num_sites = Y_obs.shape[0]
+# num_timepoints = Y_obs.shape[1]
+# hits = []
+# locs = []
+# new_X = []
+# new_Y = []
+# new_Z = []
+# new_TEM = []
+
+# # prep sim coords
+# lat_ind = list(Z_vars_sim).index("lat")
+# long_ind = list(Z_vars_sim).index("long")  
+# lat_sim = np.nanmax(Z_sim[:,:,lat_ind], axis = 1)
+# long_sim = np.nanmax(Z_sim[:,:,long_ind], axis =1)
+# coords_sim = [utils.coords2index(lon, lat) for lon, lat in zip(long_sim, lat_sim)]
+# coords_sim = np.array(coords_sim)
+# long_sim,lat_sim = coords_sim[:,0],coords_sim[:,1]
+
+# # loop through obs sites
+# for site in range(num_sites):
+#     print(site)
+#     lat_ind = list(Z_vars_obs).index("LAT")
+#     long_ind = list(Z_vars_obs).index("LON")
+#     lat_obs = np.nanmax(Z_obs[site,:,lat_ind])
+#     long_obs = np.nanmax(Z_obs[site,:,long_ind])
+#     long_obs,lat_obs = utils.coords2index(long_obs, lat_obs)
     
-    # direct hits
-    hit = np.where((lat_sim == lat_obs) & (long_sim == long_obs))[0]
+#     # direct hits
+#     hit = np.where((lat_sim == lat_obs) & (long_sim == long_obs))[0]
 
-    # open up to consider nearby grid cells.
-    if len(hit) == 0:  
-        done = False
-        radius = 0
-        while done == False:
-            radius += 0.5
-            hit = np.where((lat_sim >= lat_obs-radius) & 
-                           (lat_sim <= lat_obs+radius) &
-                           (long_sim >= long_obs-radius) &
-                           (long_sim <= long_obs+radius))[0]
-            if len(hit) > 0:
-                done = True
-                # for h in hit:
-                #     coords = Z_sim[h,0,:].numpy()
-                #     print(coords[1], coords[0])
-        # randomize hits
-        random.shuffle(hit)
-    #
-    hits.append(hit[0])  # in cases with multiple hits just taking the first (random) one
+#     # open up to consider nearby grid cells.
+#     if len(hit) == 0:  
+#         done = False
+#         radius = 0
+#         while done == False:
+#             radius += 0.5
+#             hit = np.where((lat_sim >= lat_obs-radius) & 
+#                            (lat_sim <= lat_obs+radius) &
+#                            (long_sim >= long_obs-radius) &
+#                            (long_sim <= long_obs+radius))[0]
+#             if len(hit) > 0:
+#                 done = True
+#                 # for h in hit:
+#                 #     coords = Z_sim[h,0,:].numpy()
+#                 #     print(coords[1], coords[0])
+#         # randomize hits
+#         random.shuffle(hit)
+#     #
+#     hits.append(hit[0])  # in cases with multiple hits just taking the first (random) one
 
-    # add TEM estimate to X
-    sim_data = Y_sim[hit[0], :]
-    new_TEM.append(np.array(sim_data))
+#     # add TEM estimate to X
+#     sim_data = Y_sim[hit[0], :]
+#     new_TEM.append(np.array(sim_data))
 
-    # 
-    new_data = np.concatenate([X_obs[site],sim_data], axis=1)    
+#     # 
+#     new_data = np.concatenate([X_obs[site],sim_data], axis=1)    
 
-    # # don't add flux (avoid doing this, leave for train.ipynb)    
-    # new_data = np.array(X_obs[site])
+#     # # don't add flux (avoid doing this, leave for train.ipynb)    
+#     # new_data = np.array(X_obs[site])
     
-    new_X.append(new_data)
-    new_data = np.array(Y_obs[site])        
-    new_Y.append(new_data)
-    new_data = np.array(Z_obs[site])        
-    new_Z.append(new_data)
-    locs.append([lat_obs, long_obs])
+#     new_X.append(new_data)
+#     new_data = np.array(Y_obs[site])        
+#     new_Y.append(new_data)
+#     new_data = np.array(Z_obs[site])        
+#     new_Z.append(new_data)
+#     locs.append([lat_obs, long_obs])
 
 
-#
-print(len(hits), len(set(hits)))  # I guess repeated hits means flux towers fall inside the same grid cell?
-X_obs = np.array(new_X)
-Y_obs = np.array(new_Y)
-Z_obs = np.array(new_Z)
-TEM_data = np.array(new_TEM)
-print(X_obs.shape)
-print(Y_obs.shape)
-print(Z_obs.shape)
-print(TEM_data.shape)
-X_vars_obs = np.append(X_vars_obs, "tem_flux")
-print(X_vars_obs)
+# #
+# print(len(hits), len(set(hits)))  # I guess repeated hits means flux towers fall inside the same grid cell?
+# X_obs = np.array(new_X)
+# Y_obs = np.array(new_Y)
+# Z_obs = np.array(new_Z)
+# TEM_data = np.array(new_TEM)
+# print(X_obs.shape)
+# print(Y_obs.shape)
+# print(Z_obs.shape)
+# print(TEM_data.shape)
+# X_vars_obs = np.append(X_vars_obs, "tem_flux")
+# print(X_vars_obs)
 
 
 
@@ -777,3 +740,5 @@ torch.save({'X': X_obs,
             'Y_vars': Y_vars_obs,
             'Z_vars': Z_vars_obs,
             }, fp)
+
+print("\ndone.")

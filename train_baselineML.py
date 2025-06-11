@@ -21,7 +21,7 @@ wd = sys.argv[1]
 test_ind = int(sys.argv[2])
 rep = int(sys.argv[3])
 
-finetune_path = wd + "Out/finetune_baselineML_" + str(test_ind) + "_" + str(rep) + ".sav"
+finetune_path = wd + "/Out/finetune_baselineML_" + str(test_ind) + "_" + str(rep) + ".sav"
 #path_out = wd + '/Out/output_baseline_ML_' + str(test_ind) + "_" + str(rep) + ".txt"
 
 sys.stderr.write("using working dir:" + wd + "\n")
@@ -411,5 +411,5 @@ with torch.no_grad():
     for window in range(Y_test_pred.shape[0]):         
         outline = list(Y_test_pred[window,:,0].numpy())
         outline = "\t".join(list(map(str, outline)))   
-        print(outline)
+        print("FINAL OUT:", outline)
         
