@@ -1,0 +1,82 @@
+﻿SITE_ID,LAT,LON,SITE_CLASSIFICATION,UPLAND_CLASS,IGBP,KOPPEN,MOSS_BROWN,MOSS_SPHAGNUM,AERENCHYMATOUS,ERI_SHRUB,TREE,DOM_VEG
+CA-SCB,61.3089,-121.2984,Bog,,WET,Dfc,0,1,1,1,0,moss_sphagnum
+DE-SfN,47.80639,11.3275,Bog,,WET,Cfb,0,1,1,1,1,tree
+FI-Si2,61.8372,24.1967,Bog,,WET,Dfc,0,1,1,1,1,moss_sphagnum
+JP-BBY,43.32300556,141.8106972,Bog,,WET,Dfb,0,1,1,1,0,aerenchymatous
+NZ-Kop,-37.3879,175.5539,Bog,,EBF,Cfb,0,1,1,0,0,aerenchymatous
+US-BZB,64.695547,-148.320836,Bog,,WET,Dfd,0,1,1,1,0,eri_shrub
+US-Uaf,64.86627,-147.85553,Bog,,ENF,Dwc,1,1,1,1,1,moss_sphagnum
+NL-Hor,52.24035,5.0713,Drained,Grassland,GRA,Cfb,0,0,1,0,0,aerenchymatous
+RU-Che,68.61304,161.34143,Drained,,WET,Dfc,0,0,1,1,0,aerenchymatous
+US-Bi1,38.0991538,-121.49933,Drained,Crop - alfalfa,CRO,Csa,0,0,1,0,0,aerenchymatous
+US-Bi2,38.109,-121.535,Drained,Crop - corn,CRO,Csa,0,0,1,0,0,aerenchymatous
+US-MAC,27.1632,-81.187302,Drained,Grassland,WET,Cwa,0,0,1,0,0,aerenchymatous
+US-Snd,38.0373,-121.7537,Drained,Grassland,GRA,Csa,0,0,1,0,0,aerenchymatous
+US-Tw3,38.1159,-121.6467,Drained,Crop - alfalfa,CRO,Csa,0,0,1,0,0,aerenchymatous
+DE-Hte,54.210278,12.176111,Fen,,WET,Dfb,0,0,1,0,0,aerenchymatous
+DE-Zrk,53.87594,12.88901,Fen,,WET,Dfb,0,0,1,0,0,aerenchymatous
+FI-Lom,67.99724,24.20918,Fen,,WET,Dfc,1,1,1,1,0,aerenchymatous
+FI-Sii,61.83265,24.19285,Fen,,WET,Dfc,0,1,1,0,0,moss_sphagnum
+FR-LGt,47.322917,2.284102,Fen,,WET,Cfb,0,1,1,1,0,aerenchymatous
+SE-Deg,64.182029,19.556539,Fen,,GRA,Dfc,0,1,1,1,0,moss_sphagnum
+SE-St1,68.3541488,19.050333,Fen,,WET,Dfc,1,1,1,1,0,aerenchymatous
+US-BZF,64.703733,-148.313333,Fen,,WET,Dfd,1,1,1,0,0,aerenchymatous
+US-Los,46.0827,-89.9792,Fen,,WET,Dfb,0,0,1,1,1,eri_shrub
+DE-Dgw,53.1514092,13.0542746,Lake,,WAT,Cfb,0,0,0,0,0,no vegetation
+JP-SwL,36.046572,138.108353,Lake,,WAT,Dfb,0,0,1,0,0,aerenchymatous
+HK-MPM,22.498167,114.0292358,Mangrove,,EBF,Cfa,0,0,1,0,1,aerenchymatous
+US-DPW,28.05206,-81.43611,Marsh,,WET,Cwa,0,0,1,0,0,aerenchymatous
+US-LA2,29.8587,-90.2869,Marsh,,WET,Cfa,0,0,1,0,0,aerenchymatous
+US-Myb,38.049861,-121.76498,Marsh,,WET,Csa,0,0,1,0,0,aerenchymatous
+US-ORv,40.0201,-83.0183,Marsh,,WET,Cfa,0,0,1,0,0,aerenchymatous
+US-OWC,41.37951667,-82.5124667,Marsh,,WET,Dfb,0,0,1,0,0,aerenchymatous
+US-Sne,38.0369,-121.7547,Marsh,,GRA,Csa,0,0,1,0,0,aerenchymatous
+US-Tw1,38.1074,-121.6469,Marsh,,WET,Csa,0,0,1,0,0,aerenchymatous
+US-Tw4,38.10274361,-121.6413286,Marsh,,WET,Csa,0,0,1,0,0,aerenchymatous
+US-Tw5,38.107192,-121.642576,Marsh,,WET,Csa,0,0,1,0,0,aerenchymatous
+US-WPT,41.464639,-82.996157,Marsh,,WET,Dfa,0,0,1,0,0,aerenchymatous
+IT-Cas,45.07004722,8.717522222,Rice,,CRO,Cfa,0,0,1,0,0,aerenchymatous
+JP-Mse,36.05393,140.02693,Rice,,CRO,Cfa,0,0,1,0,0,aerenchymatous
+KR-CRK,38.2013,127.2506,Rice,,CRO,Dwa,0,0,1,0,0,aerenchymatous
+PH-RiF,14.14119,121.26526,Rice,,CRO,Am,0,0,1,0,0,aerenchymatous
+US-HRA,34.585208,-91.751735,Rice,,CRO,Cfa,0,0,1,0,0,aerenchymatous
+US-HRC,34.58883,-91.751658,Rice,,CRO,Cfa,0,0,1,0,0,aerenchymatous
+US-Twt,38.1087204,-121.6531,Rice,,CRO,Csa,0,0,1,0,0,aerenchymatous
+US-EDN,37.61562,-122.114,Salt marsh,,WET,Csa,0,0,1,0,0,aerenchymatous
+US-LA1,29.5013,-90.4449,Salt marsh,,WET,Cfa,0,0,1,0,0,aerenchymatous
+US-MRM,40.8164,-74.0435,Salt marsh,,WET,Cfa,0,0,1,0,0,aerenchymatous
+US-Srr,38.200556,-122.026358,Salt marsh,,WET,Csa,0,0,1,0,0,aerenchymatous
+US-StJ,39.08821106,-75.43722534,Salt marsh,,WET,Cfa,0,0,1,0,0,aerenchymatous
+BR-Npw,-16.498,-56.412,Swamp,,WSA,Aw,0,0,1,0,1,tree
+BW-Gum,-18.96472222,22.37111111,Swamp,,WET,Bsh,0,0,1,0,1,aerenchymatous
+BW-Nxr,-19.54805556,23.17916667,Swamp,,GRA,Bsh,0,0,1,0,1,aerenchymatous
+ID-Pag,-2.32,113.9,Swamp,,EBF,Af,0,0,1,0,1,tree
+MY-MLM,1.453575,111.149492,Swamp,,EBF,Af,0,0,0,0,1,tree
+US-NC4,35.7879,-75.9038,Swamp,,WET,Cfa,0,0,1,0,1,aerenchymatous
+AT-Neu,47.11667,11.3175,Upland,Alpine meadow,GRA,Dfb,0,0,1,0,0,aerenchymatous
+CA-SCC,61.3079,-121.2992,Upland,Needleleaf forest,ENF,Dfc,0,1,0,1,1,tree
+CH-Cha,47.21022,8.41044,Upland,Grassland,GRA,Cfb,0,0,1,0,0,aerenchymatous
+CH-Dav,46.81533,9.85591,Upland,Needleleaf forest,ENF,ET,1,0,0,1,1,tree
+CH-Oe2,47.28642,7.73375,Upland,Crop - wheat,CRO,Cfb,0,0,1,0,0,aerenchymatous
+CN-Hgu,32.845278,102.59,Upland,Alpine meadow,GRA,Cwc,0,0,1,0,0,aerenchymatous
+FI-Hyy,61.84741,24.29477,Upland,Needleleaf forest,ENF,Dfc,1,1,0,1,1,tree
+IT-BCi,40.52375,14.95744,Upland,Crop - corn,CRO,Csa,0,0,1,0,0,aerenchymatous
+RU-Fy2,56.4476,32.9019,Upland,Needleleaf forest,ENF,Dfb,0,1,0,1,1,tree
+UK-LBT,51.5215,-0.1389,Upland,Urban,URB,Cfb,0,0,0,0,0,no vegetation
+US-BZS,64.69635,-148.323525,Upland,Needleleaf forest,ENF,Dfd,1,0,0,0,1,tree
+US-CRT,41.628495,-83.347086,Upland,Crop - soy,CRO,Dfa,0,0,1,0,0,aerenchymatous
+US-EML,63.8784,-149.2536,Upland,Tundra,OSH,ET,1,0,1,1,0,aerenchymatous
+US-Ho1,45.2041,-68.7402,Upland,Needleleaf forest,ENF,Dfb,0,0,0,0,1,tree
+US-PFa,45.9459,-90.2723,Upland,Mixed forest,MF,Dfb,0,0,0,0,1,tree
+RU-Ch2,68.61689,161.35089,Wet tundra,,WET,Dfc,0,0,1,1,0,aerenchymatous
+RU-Cok,70.82914,147.49428,Wet tundra,,OSH,Dfc,0,1,1,1,0,moss_sphagnum
+RU-Vrk,67.05467987,62.94046783,Wet tundra,,CSH,Dfc,0,1,1,1,0,aerenchymatous
+US-A03,70.495328,-149.882297,Wet tundra,,BSV,ET,0,1,1,0,0,moss_sphagnum
+US-A10,71.3242,-156.6149,Wet tundra,,BSV,ET,0,1,1,0,0,moss_sphagnum
+US-Atq,70.4696,-157.4089,Wet tundra,,WET,ET,1,0,1,1,0,aerenchymatous
+US-Beo,71.281,-156.6123,Wet tundra,,WET,ET,1,1,1,0,0,aerenchymatous
+US-Bes,71.2809,-156.5965,Wet tundra,,WET,ET,0,1,1,0,0,aerenchymatous
+US-ICs,68.6058,-149.311,Wet tundra,,WET,ET,0,0,1,1,0,aerenchymatous
+US-Ivo,68.4865,-155.7503,Wet tundra,,WET,ET,1,0,1,1,0,aerenchymatous
+US-NGB,71.280044,-156.609181,Wet tundra,,SNO,ET,0,1,1,0,0,moss_sphagnum
+US-NGC,64.8614,-163.7008,Wet tundra,,GRA,ET,0,1,1,1,0,eri_shrub

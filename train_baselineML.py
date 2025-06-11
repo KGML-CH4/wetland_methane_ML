@@ -411,5 +411,5 @@ with torch.no_grad():
     for window in range(Y_test_pred.shape[0]):         
         outline = list(Y_test_pred[window,:,0].numpy())
         outline = "\t".join(list(map(str, outline)))   
-        print(outline)
+        print("FINAL OUT:", outline)
         

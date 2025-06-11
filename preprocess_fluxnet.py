@@ -26,22 +26,24 @@ days_per_month = config.days_per_month
 
 
 ### combine fluxnet data
+if not os.path.exists("Out/"):
+    os.mkdir("Out/")
 combined_fluxnet_fp = wd + "/Out/fluxnet_emissions_HH.csv"
 if os.path.exists(combined_fluxnet_fp) is False:
 
     # read filelist
     sys.stderr.write("reading filelist\n")
     filelist = []
-    fp = wd + "/Data/FLUXNET_data/"
+    fp = wd + "/Data/"
     for dirpath, dirnames, filenames in os.walk(fp):
         for f in filenames:
-           if f[0:4] == "FLX_" and f[-8:] == "_1-1.csv" and "_FLUXNET-CH4_HH_" in f:
-               filelist.append(dirpath + "/" + f)
+            if f[0:4] == "FLX_" and f[-8:] == "_1-1.csv" and "_FLUXNET-CH4_HH_" in f:
+                filelist.append(dirpath + "/" + f)
 
     # read site metadata
     sys.stderr.write("reading site metadata\n")
     sites = {}
-    fp = wd + "/Data/FLUXNET_data/FLX_AA-Flx_CH4-META_20201112135337801132_reformatted.csv"
+    fp = wd + "/Data/FLX_AA-Flx_CH4-META_20201112135337801132_reformatted.csv"
     with open(fp) as infile:
         meta_header = infile.readline().strip().split(",")
         meta_header[0] = "SITE_ID"  # (addressing a weird formatting thing)
@@ -590,110 +592,110 @@ print(X_vars_obs)
 
 
 
-# load simulated data
-fp = wd + "Out/preprocessed_sim.sav"
-data0 = torch.load(fp, weights_only=False)
-Y_sim = torch.tensor(data0['Y'])
-Y_stats_sim = torch.tensor(data0['Y_stats'])
-Z_sim = data0['Z']
-Z_vars_sim = data0['Z_vars']
-# Y_stats = data0['Y_stats']
-print(Y_sim.shape, flush=True)
-print(Z_sim.shape, flush=True)
-print(Z_vars_sim, flush=True)
+# # load simulated data
+# fp = wd + "Out/preprocessed_sim.sav"
+# data0 = torch.load(fp, weights_only=False)
+# Y_sim = torch.tensor(data0['Y'])
+# Y_stats_sim = torch.tensor(data0['Y_stats'])
+# Z_sim = data0['Z']
+# Z_vars_sim = data0['Z_vars']
+# # Y_stats = data0['Y_stats']
+# print(Y_sim.shape, flush=True)
+# print(Z_sim.shape, flush=True)
+# print(Z_vars_sim, flush=True)
 
-# convert -9999 to nan
-print(torch.sum(np.isnan(Y_sim)))
-print(len(np.where(Y_sim == -9999)[0]))
-Y_sim[np.where(Y_sim==-9999)] = np.nan
-print(torch.sum(np.isnan(Y_sim)))
-print(len(np.where(Y_sim == -9999)[0]))
-
-
+# # convert -9999 to nan
+# print(torch.sum(np.isnan(Y_sim)))
+# print(len(np.where(Y_sim == -9999)[0]))
+# Y_sim[np.where(Y_sim==-9999)] = np.nan
+# print(torch.sum(np.isnan(Y_sim)))
+# print(len(np.where(Y_sim == -9999)[0]))
 
 
-### align by lat long
-print(X_obs.shape)
-num_sites = Y_obs.shape[0]
-num_timepoints = Y_obs.shape[1]
-hits = []
-locs = []
-new_X = []
-new_Y = []
-new_Z = []
-new_TEM = []
 
-# prep sim coords
-lat_ind = list(Z_vars_sim).index("lat")
-long_ind = list(Z_vars_sim).index("long")  
-lat_sim = np.nanmax(Z_sim[:,:,lat_ind], axis = 1)
-long_sim = np.nanmax(Z_sim[:,:,long_ind], axis =1)
-coords_sim = [utils.coords2index(lon, lat) for lon, lat in zip(long_sim, lat_sim)]
-coords_sim = np.array(coords_sim)
-long_sim,lat_sim = coords_sim[:,0],coords_sim[:,1]
 
-# loop through obs sites
-for site in range(num_sites):
-    print(site)
-    lat_ind = list(Z_vars_obs).index("LAT")
-    long_ind = list(Z_vars_obs).index("LON")
-    lat_obs = np.nanmax(Z_obs[site,:,lat_ind])
-    long_obs = np.nanmax(Z_obs[site,:,long_ind])
-    long_obs,lat_obs = utils.coords2index(long_obs, lat_obs)
+# ### align by lat long
+# print(X_obs.shape)
+# num_sites = Y_obs.shape[0]
+# num_timepoints = Y_obs.shape[1]
+# hits = []
+# locs = []
+# new_X = []
+# new_Y = []
+# new_Z = []
+# new_TEM = []
+
+# # prep sim coords
+# lat_ind = list(Z_vars_sim).index("lat")
+# long_ind = list(Z_vars_sim).index("long")  
+# lat_sim = np.nanmax(Z_sim[:,:,lat_ind], axis = 1)
+# long_sim = np.nanmax(Z_sim[:,:,long_ind], axis =1)
+# coords_sim = [utils.coords2index(lon, lat) for lon, lat in zip(long_sim, lat_sim)]
+# coords_sim = np.array(coords_sim)
+# long_sim,lat_sim = coords_sim[:,0],coords_sim[:,1]
+
+# # loop through obs sites
+# for site in range(num_sites):
+#     print(site)
+#     lat_ind = list(Z_vars_obs).index("LAT")
+#     long_ind = list(Z_vars_obs).index("LON")
+#     lat_obs = np.nanmax(Z_obs[site,:,lat_ind])
+#     long_obs = np.nanmax(Z_obs[site,:,long_ind])
+#     long_obs,lat_obs = utils.coords2index(long_obs, lat_obs)
     
-    # direct hits
-    hit = np.where((lat_sim == lat_obs) & (long_sim == long_obs))[0]
+#     # direct hits
+#     hit = np.where((lat_sim == lat_obs) & (long_sim == long_obs))[0]
 
-    # open up to consider nearby grid cells.
-    if len(hit) == 0:  
-        done = False
-        radius = 0
-        while done == False:
-            radius += 0.5
-            hit = np.where((lat_sim >= lat_obs-radius) & 
-                           (lat_sim <= lat_obs+radius) &
-                           (long_sim >= long_obs-radius) &
-                           (long_sim <= long_obs+radius))[0]
-            if len(hit) > 0:
-                done = True
-                # for h in hit:
-                #     coords = Z_sim[h,0,:].numpy()
-                #     print(coords[1], coords[0])
-        # randomize hits
-        random.shuffle(hit)
-    #
-    hits.append(hit[0])  # in cases with multiple hits just taking the first (random) one
+#     # open up to consider nearby grid cells.
+#     if len(hit) == 0:  
+#         done = False
+#         radius = 0
+#         while done == False:
+#             radius += 0.5
+#             hit = np.where((lat_sim >= lat_obs-radius) & 
+#                            (lat_sim <= lat_obs+radius) &
+#                            (long_sim >= long_obs-radius) &
+#                            (long_sim <= long_obs+radius))[0]
+#             if len(hit) > 0:
+#                 done = True
+#                 # for h in hit:
+#                 #     coords = Z_sim[h,0,:].numpy()
+#                 #     print(coords[1], coords[0])
+#         # randomize hits
+#         random.shuffle(hit)
+#     #
+#     hits.append(hit[0])  # in cases with multiple hits just taking the first (random) one
 
-    # add TEM estimate to X
-    sim_data = Y_sim[hit[0], :]
-    new_TEM.append(np.array(sim_data))
+#     # add TEM estimate to X
+#     sim_data = Y_sim[hit[0], :]
+#     new_TEM.append(np.array(sim_data))
 
-    # 
-    new_data = np.concatenate([X_obs[site],sim_data], axis=1)    
+#     # 
+#     new_data = np.concatenate([X_obs[site],sim_data], axis=1)    
 
-    # # don't add flux (avoid doing this, leave for train.ipynb)    
-    # new_data = np.array(X_obs[site])
+#     # # don't add flux (avoid doing this, leave for train.ipynb)    
+#     # new_data = np.array(X_obs[site])
     
-    new_X.append(new_data)
-    new_data = np.array(Y_obs[site])        
-    new_Y.append(new_data)
-    new_data = np.array(Z_obs[site])        
-    new_Z.append(new_data)
-    locs.append([lat_obs, long_obs])
+#     new_X.append(new_data)
+#     new_data = np.array(Y_obs[site])        
+#     new_Y.append(new_data)
+#     new_data = np.array(Z_obs[site])        
+#     new_Z.append(new_data)
+#     locs.append([lat_obs, long_obs])
 
 
-#
-print(len(hits), len(set(hits)))  # I guess repeated hits means flux towers fall inside the same grid cell?
-X_obs = np.array(new_X)
-Y_obs = np.array(new_Y)
-Z_obs = np.array(new_Z)
-TEM_data = np.array(new_TEM)
-print(X_obs.shape)
-print(Y_obs.shape)
-print(Z_obs.shape)
-print(TEM_data.shape)
-X_vars_obs = np.append(X_vars_obs, "tem_flux")
-print(X_vars_obs)
+# #
+# print(len(hits), len(set(hits)))  # I guess repeated hits means flux towers fall inside the same grid cell?
+# X_obs = np.array(new_X)
+# Y_obs = np.array(new_Y)
+# Z_obs = np.array(new_Z)
+# TEM_data = np.array(new_TEM)
+# print(X_obs.shape)
+# print(Y_obs.shape)
+# print(Z_obs.shape)
+# print(TEM_data.shape)
+# X_vars_obs = np.append(X_vars_obs, "tem_flux")
+# print(X_vars_obs)
 
 
 
