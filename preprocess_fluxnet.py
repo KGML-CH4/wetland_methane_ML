@@ -141,53 +141,16 @@ print(set(list(X_obs[:,3])))
 # 'FCH4_F_ANNOPTLM', 'FCH4_F_RANDUNC', 'FCH4_F_ANNOPTLM_UNC', 'FCH4_F_ANNOPTLM_QC']
 
 keepers = []
-keepers.append(0)  # SITE_ID
-keepers.append(1)  # lat 
-keepers.append(2)  # long
-keepers.append(3)  # site_classification
-#keepers.append(4)  # upland class
-#keepers.append(5)  # IGBP
-
-#keepers.append(6)  # KOPPEN
-#keepers.append(7)  # MOSS_Brown
-#keepers.append(8)  # MOSS_Sphagnum
-#keepers.append(9)  # AERENCHYMATOUS
-#keepers.append(10)  # ERI_SHRUB
-#keepers.append(11)  # TREE
-
-#keepers.append(12)  # DOM_VEG (not sure if we know this info for new grid cells)
-keepers.append(13)  # TIMESTAMP_START
-#keepers.append(14)  # TIMESTAMP_END
-#keepers.append(15)  # NEE. net ecosystem exchange (CO2)- using gap-filled version 
-#keepers.append(16)  # H.  Sensible heat flux — using gap-filled version 
-#keepers.append(17)  # LE. latent heat flux — using gap-filled version 
-keepers.append(18)  # FCH4. methane flux (raw)
-#keepers.append(19)  # USTAR. Friction velocity
-#keepers.append(20)  # SW_IN. Shortwave radiation, incoming
-#keepers.append(21)  # GPP_DT. Gross Primary Productivity (dont know what the "_DT" is)
-
-#keepers.append(22)  # RECO_DT. Ecosystem Respiration (dont know what the "_DT" is)
-#keepers.append(23)  # WS. wind speed — using gap-filled
-#keepers.append(24)  # NEE_F. net ecosystem exchange (CO2)
-#keepers.append(25)  # H_F.  Sensible heat flux
-keepers.append(26)  # LE_F. latent heat flux
-keepers.append(27)  # FCH4_F. response/target variable, gap-filled
-#keepers.append(28)  # SW_IN_F. Shortwave radiation, incoming
-#keepers.append(29)  # LW_IN_F. Longwave radiation, incoming
-# keepers.append(30)  # VPD_F. Vapor Pressure Deficit
-
-#keepers.append(31)  # PA_F. atmospheric pressure
-keepers.append(32)  # TA_F. air temp  "Gaps in meteorological variables including air temperature (TA), were filled with ERA-Interim (ERA-I) reanalysis data (Vuichard and Papale 2015)"
-# keepers.append(33)  # P_F. Precipitation
-#keepers.append(34)  # WS_F. wind speed
-#keepers.append(35)  # LE_F_ANNOPTLM - neural net filled
-# keepers.append(36)  # NEE_F_ANNOPTLM
-
-keepers.append(37)  # FCH4_F_ANNOPTLM
-# keepers.append(38)  # FCH4_F_RANDUNC
-# keepers.append(39)  # FCH4_F_ANNOPTLM_UNC
-# keepers.append(40)  # FCH4_F_ANNOPTLM_QC
-
+keepers.append(list(X_vars_obs).index("SITE_ID"))  
+keepers.append(list(X_vars_obs).index("LAT"))  
+keepers.append(list(X_vars_obs).index("LON"))  
+keepers.append(list(X_vars_obs).index("SITE_CLASSIFICATION"))
+keepers.append(list(X_vars_obs).index("TIMESTAMP_START"))
+keepers.append(list(X_vars_obs).index("FCH4"))
+keepers.append(list(X_vars_obs).index("LE_F"))
+keepers.append(list(X_vars_obs).index("FCH4_F"))
+keepers.append(list(X_vars_obs).index("TA_F"))
+keepers.append(list(X_vars_obs).index("FCH4_F_ANNOPTLM"))
 print(keepers)
 X_vars_obs = X_vars_obs[keepers]
 X_obs = X_obs[:, keepers]
@@ -779,3 +742,5 @@ torch.save({'X': X_obs,
             'Y_vars': Y_vars_obs,
             'Z_vars': Z_vars_obs,
             }, fp)
+
+print("\ndone.")
