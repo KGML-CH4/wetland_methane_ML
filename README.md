@@ -24,23 +24,7 @@ apptainer exec --nv --bind </host/path/>:</container/path/> wmml.sif python <tra
 
 
 
-## preprocessing_FLUXNET
-
-Inputs required in the specified working/data directoy.
-
-- metadata (reformatted)                                                                                                       
-
-- wetland_classification.txt
-
-- half hourly fluxnet data files
-
-
-##### Prepping metadata
-```
-mkdir Data/
-ln -s ~/Software/wetland_methane_ML/Data/FLX_AA-Flx_CH4-META_20201112135337801132_reformatted.csv $PWD/Data/
-ln -s ~/Software/wetland_methane_ML/Data/wetland_classification.txt $PWD/Data/
-```
+## Preprocessing FLUXNET data
 
 ##### Instructions for downloading FLUXNET data.
 - navigate to https://fluxnet.org/data/download-data/
@@ -51,6 +35,18 @@ ln -s ~/Software/wetland_methane_ML/Data/wetland_classification.txt $PWD/Data/
 
 - download and unzip each/all sites
 
+
+##### Prepping metadata
+```
+mkdir -p temp_ch4/Data/
+ln -s ~/Software/wetland_methane_ML/Data/FLX_AA-Flx_CH4-META_20201112135337801132_reformatted.csv $PWD/temp_ch4/Data/
+ln -s ~/Software/wetland_methane_ML/Data/wetland_classification.txt $PWD/temp_ch4/Data/
+```
+
+##### preprocessing_FLUXNET.py
+```
+python wetland_methane_ML/preprocess_fluxnet.py temp_ch4
+```
 
 
 
