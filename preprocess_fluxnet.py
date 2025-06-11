@@ -28,83 +28,81 @@ days_per_month = config.days_per_month
 ### combine fluxnet data
 if not os.path.exists("Out/"):
     os.mkdir("Out/")
-combined_fluxnet_fp = wd + "/Out/fluxnet_emissions_HH.csv"
-if os.path.exists(combined_fluxnet_fp) is False:
 
-    # read filelist
-    sys.stderr.write("reading filelist\n")
-    filelist = []
-    fp = wd + "/Data/"
-    for dirpath, dirnames, filenames in os.walk(fp):
-        for f in filenames:
-            if f[0:4] == "FLX_" and f[-8:] == "_1-1.csv" and "_FLUXNET-CH4_HH_" in f:
-                filelist.append(dirpath + "/" + f)
+# read filelist
+sys.stderr.write("reading filelist\n")
+filelist = []
+fp = wd + "/Data/"
+for dirpath, dirnames, filenames in os.walk(fp):
+    for f in filenames:
+        if f[0:4] == "FLX_" and f[-8:] == "_1-1.csv" and "_FLUXNET-CH4_HH_" in f:
+            filelist.append(dirpath + "/" + f)
 
-    # read site metadata
-    sys.stderr.write("reading site metadata\n")
-    sites = {}
-    fp = wd + "/Data/FLX_AA-Flx_CH4-META_20201112135337801132_reformatted.csv"
-    with open(fp) as infile:
-        meta_header = infile.readline().strip().split(",")
-        meta_header[0] = "SITE_ID"  # (addressing a weird formatting thing)
-        #del meta_header[4]  # removing "UPLAND_CLASS" for now, lots of missing data  
+# read site metadata
+sys.stderr.write("reading site metadata\n")
+sites = {}
+fp = wd + "/Data/FLX_AA-Flx_CH4-META_20201112135337801132_reformatted.csv"
+with open(fp) as infile:
+    meta_header = infile.readline().strip().split(",")
+    meta_header[0] = "SITE_ID"  # (addressing a weird formatting thing)
+    #del meta_header[4]  # removing "UPLAND_CLASS" for now, lots of missing data  
+    for line in infile:
+        newline = line.strip().split(",")
+        siteid = newline[0]
+        #del newline[4]
+        sites[siteid] = newline
+
+# explore header information
+sys.stderr.write("exploring header info\n")
+header_info = {}
+for f in filelist:
+    with open(f) as infile:
+        header = infile.readline().strip().split(",")
+        for thing in header:
+            if thing not in header_info:
+                header_info[thing] = 0
+            header_info[thing] += 1
+keep_fields = {}  # for now usig vars shared across all sites/files
+for thing in header_info:
+    if header_info[thing] == len(filelist):
+        keep_fields[thing] = 0
+
+# loop through and get data (not memory efficient; but not memory limited, can run on macbook with other apps closed)
+data = []
+sys.stderr.write("looping through files and collecting data\n")
+for f in filelist:
+    sys.stderr.write("\t" + f + "\n")
+    siteid = f.split("/")[-1].split("_")[1]
+    keep_indices = []
+    current_data = []
+    with open(f) as infile:
+        header = infile.readline().strip().split(",")
+        for i in range(len(header)):
+            if header[i] in keep_fields:
+                keep_indices.append(i)
         for line in infile:
             newline = line.strip().split(",")
-            siteid = newline[0]
-            #del newline[4]
-            sites[siteid] = newline
+            newline = np.array(list(map(float, newline)))
+            newline = newline[keep_indices]
+            newline = np.concatenate([np.array(sites[siteid]), newline])
+            data.append(newline)
+#
+data = np.array(data)
 
-    # explore header information
-    sys.stderr.write("exploring header info\n")
-    header_info = {}
-    for f in filelist:
-        with open(f) as infile:
-            header = infile.readline().strip().split(",")
-            for thing in header:
-                if thing not in header_info:
-                    header_info[thing] = 0
-                header_info[thing] += 1
-    keep_fields = {}  # for now usig vars shared across all sites/files
-    for thing in header_info:
-        if header_info[thing] == len(filelist):
-            keep_fields[thing] = 0
-
-    # loop through and get data (not memory efficient; but not memory limited, can run on macbook with other apps closed)
-    data = []
-    sys.stderr.write("looping through files and collecting data\n")
-    for f in filelist:
-        sys.stderr.write("\t" + f + "\n")
-        siteid = f.split("/")[-1].split("_")[1]
-        keep_indices = []
-        current_data = []
-        with open(f) as infile:
-            header = infile.readline().strip().split(",")
-            for i in range(len(header)):
-                if header[i] in keep_fields:
-                    keep_indices.append(i)
-            for line in infile:
-                newline = line.strip().split(",")
-                newline = np.array(list(map(float, newline)))
-                newline = newline[keep_indices]
-                newline = np.concatenate([np.array(sites[siteid]), newline])
-                data.append(newline)
-    #
-    data = np.array(data)
-
-    # write
-    sys.stderr.write("writing output\n")
-    fp = wd + "/Out/fluxnet_emissions_HH.csv"
-    header = np.array(header)[keep_indices]
-    header = np.array(meta_header + list(header))
-    with open(fp, "w") as outfile:
-        outfile.write(",".join(header) + "\n")
-        for line in data:
-            outfile.write(",".join(line) + "\n")
+# write
+sys.stderr.write("writing output\n")
+fp = wd + "/Out/fluxnet_emissions_HH.csv"
+header = np.array(header)[keep_indices]
+header = np.array(meta_header + list(header))
+with open(fp, "w") as outfile:
+    outfile.write(",".join(header) + "\n")
+    for line in data:
+        outfile.write(",".join(line) + "\n")
 
 ### read fluxnet data
 X_obs = []
 counter = 0
-with open(combined_fluxnet_fp) as infile:  #3,096,831 lines
+with open(fp) as infile:  #3,096,831 lines
     X_vars_obs = np.array(infile.readline().strip().split(","))
     print(X_vars_obs)
     for line in infile:
