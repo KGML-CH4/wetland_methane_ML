@@ -10,6 +10,7 @@ First install conda, instructions here: https://www.anaconda.com/docs/getting-st
 Then,
 ```
 conda env create -f requirements.yml
+conda activate wmml
 ```
 
 ## Container
