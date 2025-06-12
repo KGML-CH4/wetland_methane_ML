@@ -5,6 +5,9 @@ Estimating wetland methane emissions using transfer learning.
 
 
 ## Install instructions
+First install conda, instructions here: https://www.anaconda.com/docs/getting-started/miniconda/install#linux-terminal-installer
+
+Then,
 ```
 conda env create -f requirements.yml
 ```
