@@ -26,8 +26,9 @@ days_per_month = config.days_per_month
 
 
 ### combine fluxnet data
-if not os.path.exists("Out/"):
-    os.mkdir("Out/")
+fp = wd + "/Out/"
+if not os.path.exists(fp):
+    os.mkdir(fp)
 
 # read filelist
 sys.stderr.write("reading filelist\n")
