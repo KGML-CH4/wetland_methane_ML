@@ -5,8 +5,12 @@ Estimating wetland methane emissions using transfer learning.
 
 
 ## Install instructions
+First install conda, instructions here: https://www.anaconda.com/docs/getting-started/miniconda/install#linux-terminal-installer
+
+Then,
 ```
 conda env create -f requirements.yml
+conda activate wmml
 ```
 
 ## Container
@@ -44,6 +48,7 @@ ln -s ~/Software/wetland_methane_ML/Data/wetland_classification.txt $PWD/temp_ch
 ```
 
 ##### preprocessing_FLUXNET.py
+I usually ask for 50Gb RAM for this step.
 ```
 python wetland_methane_ML/preprocess_fluxnet.py temp_ch4
 ```
@@ -58,6 +63,7 @@ python wetland_methane_ML/preprocess_fluxnet.py temp_ch4
 
 
 ## training scripts
+Should work with 20Gb RAM
 Usage:
 ```
 python train.py <working_dir> <test_site_index> <rep>
