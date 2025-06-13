@@ -15,13 +15,12 @@ conda activate wmml
 
 ## Container
 Alternatively, we provide a fully contained and compiled Apptainer image including the torch and cuda software for training ML models: zenodo.org/records/15611626.
+
 Usage:
 ```
 wget https://zenodo.org/records/15611626/files/wmml.sif
 apptainer exec --nv --bind </host/path/>:</container/path/> wmml.sif python <training_script>
 ```
-
-
 
 
 
@@ -47,7 +46,7 @@ ln -s ~/Software/wetland_methane_ML/Data/FLX_AA-Flx_CH4-META_2020111213533780113
 ln -s ~/Software/wetland_methane_ML/Data/wetland_classification.txt $PWD/temp_ch4/Data/
 ```
 
-##### preprocessing_FLUXNET.py
+##### Running preprocessing.py
 I usually ask for 50Gb RAM for this step.
 ```
 python wetland_methane_ML/preprocess_fluxnet.py temp_ch4
@@ -62,7 +61,7 @@ python wetland_methane_ML/preprocess_fluxnet.py temp_ch4
 
 
 
-## training scripts
+## Training
 Should work with 20Gb RAM
 Usage:
 ```
