@@ -22,14 +22,18 @@ process Train_Model {
         ${workdir} \
         ${test_index} \
         ${rep} \
-        > results_${test_index}_${rep}.txt
+        | grep "FINAL OUT" \
+        > ${workdir}/Out/LOOCV_baseline_ml/results_${test_index}_${rep}.txt
     """
 }
 
 workflow {
+    def outputDir = file("${params.workdir}/Out/LOOCV_baseline_ml")
+    outputDir.mkdirs()
+
     ch_a = Channel.of(params.workdir)
-    ch_b = Channel.of( 1..params.num_sites )
-    ch_c = Channel.of( 1..params.num_reps )
+    ch_b = Channel.of( 0..(params.num_sites-1) ) //0-index
+    ch_c = Channel.of( 0..(params.num_reps-1) )
     
     combined_channel = ch_a.combine(ch_b)
     combined_channel = combined_channel.combine(ch_c)

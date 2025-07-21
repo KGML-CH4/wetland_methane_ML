@@ -258,7 +258,7 @@ for param_tensor in model.state_dict():
 optimizer = optim.Adam(model.parameters(), lr=lr_adam) #add weight decay normally 1-9e-4
 
 # scheduler
-scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=patience, factor=factor, verbose=True)
+scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=patience, factor=factor)
 
 # initialize some varts
 loss_val_best = 500000

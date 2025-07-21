@@ -36,7 +36,7 @@ apptainer exec --nv --bind </host/path/>:</container/path/> wmml.sif python <tra
 
 - select sites you want (see our paper for the sites we used)
 
-- download and unzip each/all sites
+- download and unzip each/all sites inside the working_directory/Data/ folder
 
 
 ##### Prepping metadata
