@@ -14,22 +14,20 @@ process Train_Model {
     tuple val(workdir), val(test_index), val(rep)
 
     output:
-    path "results_${test_index}_${rep}.txt"
+    path "Out/Baseline_ML/results_site_${test_index}_rep_${rep}.txt"
 
     script:
     """
     python ${params.repo}/train_baselineML.py \
         ${workdir} \
         ${test_index} \
-        ${rep} \
-        | grep "FINAL OUT" \
-        > ${workdir}/Out/LOOCV_baseline_ml/results_${test_index}_${rep}.txt
+        ${rep}
     """
 }
 
 workflow {
-    def outputDir = file("${params.workdir}/Out/LOOCV_baseline_ml")
-    outputDir.mkdirs()
+//    def outputDir = file("${params.workdir}/Out/LOOCV_baseline_ml")
+  //  outputDir.mkdirs()
 
     ch_a = Channel.of(params.workdir)
     ch_b = Channel.of( 0..(params.num_sites-1) ) //0-index
@@ -39,3 +37,4 @@ workflow {
     combined_channel = combined_channel.combine(ch_c)
     Train_Model(combined_channel)
 }
+
