@@ -3,26 +3,25 @@ params.each { k, v ->
 }
 println "=============================\n"
 
-
-
 workflow {
-    // train with baseline ML model                       
+    // train with baseline ML model                                                               
     ch_a = Channel.of(params.workdir)
-    ch_b = Channel.of( 0..(params.num_sites-1) ) //0-index
+    ch_b = Channel.of( 0..(params.num_sites-1) ) //0-index                                        
     ch_c = Channel.of( 0..(params.num_reps-1) )
     combined_channel = ch_a.combine(ch_b)
     combined_channel = combined_channel.combine(ch_c)
     baselineML = Train_baselineML(combined_channel)
 
-    // evaluate
+    // evaluate                                                                                   
     baselineML
-    	.collect() 
-    	.map { result_files ->
+        .collect()
+        .map { result_files ->
             tuple("${params.workdir}/Out/Baseline_ML/", "Baseline machine learning", result_files)
-    	}
-    	.set { inpt }
+        }
+        .set { inpt }
     Eval(inpt)
 }
+
 
 
 
@@ -30,6 +29,7 @@ process Train_baselineML {
     publishDir "${params.workdir}/Out/Baseline_ML/", mode: 'copy'    
     tag "${test_index}_${rep}"
     conda "${params.repo}/requirements.yml"
+    errorStrategy 'ignore'
 
     input:
     tuple val(workdir), val(test_index), val(rep)
@@ -48,8 +48,6 @@ process Train_baselineML {
     """
 }
 
-
-
 process Eval {
     publishDir "${params.workdir}/Out/Baseline_ML/", mode: 'copy'
     tag "eval_baselineML"
@@ -60,14 +58,11 @@ process Eval {
 
     output:
     path "evaluation.pdf"
-    
     script:
-    """
-    python ${params.repo}/evaluate.py \
-        ${params.workdir} \
-        ${output_dir} \
-        "${plot_title}"
+    """                                                                                                                            
+    python ${params.repo}/evaluate.py \                                                                                            
+        ${params.workdir} \                                                                                                        
+        ${output_dir} \                                                                                                            
+        "${plot_title}"                                                                                                            
     """
 }
-
-
