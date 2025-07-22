@@ -9,3 +9,4 @@ dependencies:
   - numpy
   - matplotlib
   - netCDF4
+  - rasterio

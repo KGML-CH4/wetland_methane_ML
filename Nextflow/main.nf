@@ -4,17 +4,16 @@ params.each { k, v ->
 println "=============================\n"
 
 process Train_Model {
-    publishDir "results/"
-    
+    publishDir "${params.workdir}/Out/Baseline_ML", mode: 'copy'    
     tag "${test_index}_${rep}"
-
     conda "${params.repo}/requirements.yml"
+    errorStrategy 'ignore'
 
     input:
     tuple val(workdir), val(test_index), val(rep)
 
     output:
-    path "results_${test_index}_${rep}.txt"
+    path "results_site_${test_index}_rep_${rep}.txt"
 
     script:
     """
@@ -22,16 +21,20 @@ process Train_Model {
         ${workdir} \
         ${test_index} \
         ${rep} \
-        > results_${test_index}_${rep}.txt
+        | grep "FINAL OUT" \
+        > "results_site_${test_index}_rep_${rep}.txt"
     """
 }
 
 workflow {
     ch_a = Channel.of(params.workdir)
-    ch_b = Channel.of( 1..params.num_sites )
-    ch_c = Channel.of( 1..params.num_reps )
+    ch_b = Channel.of( 0..(params.num_sites-1) ) //0-index
+    ch_c = Channel.of( 0..(params.num_reps-1) )
     
     combined_channel = ch_a.combine(ch_b)
     combined_channel = combined_channel.combine(ch_c)
     Train_Model(combined_channel)
 }
+
+
+

@@ -20,10 +20,9 @@ from nn_architectures import pureML_GRU
 wd = sys.argv[1]
 test_ind = int(sys.argv[2])
 rep = int(sys.argv[3])
-
-finetune_path = wd + "/Out/finetune_baselineML_" + str(test_ind) + "_" + str(rep) + ".sav"
-#path_out = wd + '/Out/output_baseline_ML_' + str(test_ind) + "_" + str(rep) + ".txt"
-
+output_path = wd + "/Out/Baseline_ML/"
+os.makedirs(output_path, exist_ok=True)
+finetune_path = output_path + "/finetune_baselineML_" + str(test_ind) + "_" + str(rep) + ".sav"  # separate filenames for each site/rep to allow parallel training
 sys.stderr.write("using working dir:" + wd + "\n")
 
 
@@ -258,7 +257,7 @@ for param_tensor in model.state_dict():
 optimizer = optim.Adam(model.parameters(), lr=lr_adam) #add weight decay normally 1-9e-4
 
 # scheduler
-scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=patience, factor=factor, verbose=True)
+scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=patience, factor=factor)
 
 # initialize some varts
 loss_val_best = 500000
@@ -401,15 +400,9 @@ with torch.no_grad():
     print(loss_test, flush=True)
 
     # write
-    # fp = path_out + str(test_ind) + "_rep_" + str(rep) + '.txt'
-    # print(path_out)
-    # with open(path_out, "w") as outfile:
-    #     for window in range(Y_test_pred.shape[0]):
-    #         outline = list(Y_test_pred[window,:,0].numpy())
-    #         outline = "\t".join(list(map(str, outline)))
-    #         outfile.write(outline + "\n")
-    for window in range(Y_test_pred.shape[0]):         
+    for window in range(Y_test_pred.shape[0]):
         outline = list(Y_test_pred[window,:,0].numpy())
-        outline = "\t".join(list(map(str, outline)))   
+        outline = "\t".join(list(map(str, outline)))
+        #outfile.write(outline + "\n")
         print("FINAL OUT:", outline)
         
