@@ -400,11 +400,9 @@ with torch.no_grad():
     print(loss_test, flush=True)
 
     # write
-    fp = output_path + "/results_site_" + str(test_ind) + "_rep_" + str(rep) + '.txt'
-    with open(fp, "w") as outfile:
-        for window in range(Y_test_pred.shape[0]):
-            outline = list(Y_test_pred[window,:,0].numpy())
-            outline = "\t".join(list(map(str, outline)))
-            outfile.write(outline + "\n")
-            print("FINAL OUT:", outline)
+    for window in range(Y_test_pred.shape[0]):
+        outline = list(Y_test_pred[window,:,0].numpy())
+        outline = "\t".join(list(map(str, outline)))
+        #outfile.write(outline + "\n")
+        print("FINAL OUT:", outline)
         

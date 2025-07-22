@@ -4,7 +4,7 @@ params.each { k, v ->
 println "=============================\n"
 
 process Train_Model {
-    publishDir "results/"
+    publishDir "${params.workdir}/Out/Baseline_ML", mode: 'copy'
     
     tag "${test_index}_${rep}"
 
@@ -14,14 +14,16 @@ process Train_Model {
     tuple val(workdir), val(test_index), val(rep)
 
     output:
-    path "Out/Baseline_ML/results_site_${test_index}_rep_${rep}.txt"
+    path "results_site_${test_index}_rep_${rep}.txt"
 
     script:
     """
     python ${params.repo}/train_baselineML.py \
         ${workdir} \
         ${test_index} \
-        ${rep}
+        ${rep} \
+        | grep "FINAL OUT" \
+        > "results_site_${test_index}_rep_${rep}.txt"
     """
 }
 
