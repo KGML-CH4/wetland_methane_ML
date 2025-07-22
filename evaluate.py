@@ -448,4 +448,4 @@ legend_handles = [
 plt.legend(handles=legend_handles, loc='upper left', fontsize=12)
 
 plt.show()
-fig.savefig(output_path + "/evaluation.pdf", bbox_inches='tight')
+fig.savefig("evaluation.pdf", bbox_inches='tight')

@@ -2,6 +2,7 @@ name: wmml
 channels:
   - pytorch
   - nvidia
+  - conda-forge
 dependencies:
   - python=3.12.7
   - pytorch=2.5.1
@@ -10,3 +11,4 @@ dependencies:
   - matplotlib
   - netCDF4
   - rasterio
+  - scikit-learn
