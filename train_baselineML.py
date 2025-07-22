@@ -22,7 +22,7 @@ test_ind = int(sys.argv[2])
 rep = int(sys.argv[3])
 output_path = wd + "/Out/Baseline_ML/"
 os.makedirs(output_path, exist_ok=True)
-finetune_path = output_path + "/finetune_baselineML_" + str(test_ind) + "_" + str(rep) + ".sav"
+finetune_path = output_path + "/finetune_baselineML_" + str(test_ind) + "_" + str(rep) + ".sav"  # separate filenames for each site/rep to allow parallel training
 sys.stderr.write("using working dir:" + wd + "\n")
 
 

@@ -62,9 +62,14 @@ python wetland_methane_ML/preprocess_fluxnet.py temp_ch4
 
 
 ## Training
-Should work with 20Gb RAM
 Usage:
 ```
-python train.py <working_dir> <test_site_index> <rep>
+python <training_script>.py <working_dir> <test_site_index> <rep>
 ```
 
+
+## Model evaluation
+Usage:
+```
+python evaluate.py <working_dir> <model_output_dir> "<plot_title>"
+```

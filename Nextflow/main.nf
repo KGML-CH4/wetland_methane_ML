@@ -4,11 +4,10 @@ params.each { k, v ->
 println "=============================\n"
 
 process Train_Model {
-    publishDir "${params.workdir}/Out/Baseline_ML", mode: 'copy'
-    
+    publishDir "${params.workdir}/Out/Baseline_ML", mode: 'copy'    
     tag "${test_index}_${rep}"
-
     conda "${params.repo}/requirements.yml"
+    errorStrategy 'ignore'
 
     input:
     tuple val(workdir), val(test_index), val(rep)
@@ -28,9 +27,6 @@ process Train_Model {
 }
 
 workflow {
-//    def outputDir = file("${params.workdir}/Out/LOOCV_baseline_ml")
-  //  outputDir.mkdirs()
-
     ch_a = Channel.of(params.workdir)
     ch_b = Channel.of( 0..(params.num_sites-1) ) //0-index
     ch_c = Channel.of( 0..(params.num_reps-1) )
@@ -39,4 +35,6 @@ workflow {
     combined_channel = combined_channel.combine(ch_c)
     Train_Model(combined_channel)
 }
+
+
 
