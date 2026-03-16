@@ -1,3 +1,6 @@
+// baseline GRU model, trained on real data
+
+
 params.each { k, v -> 
     println "- $k = $v"
 }
