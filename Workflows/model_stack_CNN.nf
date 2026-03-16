@@ -8,8 +8,12 @@ params.each { k, v ->
 println "=============================\n"
 
 workflow {
-    // download MODIS images
+    // download MODIS images at fluxnet sites
     Download_MODIS_fluxnet()
+
+    // download MODIS images for 0.5 degree grid cells
+    ch_a = Channel.of( 1..40 )
+    Download_MODIS_global(ch_a)
 
     // preprocess TEM and reanalysis data
     Preprocess_TEM()
@@ -21,12 +25,10 @@ workflow {
     Preprocess_model()
 
     // train with baseline ML model                                                               
-    ch_a = Channel.of(params.workdir)
-    ch_b = Channel.of( 0..(params.num_sites-1) ) //0-index                                        
-    ch_c = Channel.of( 0..(params.num_reps-1) )
+    ch_a = Channel.of( 0..(params.num_sites-1) ) //0-index                                        
+    ch_b = Channel.of( 0..(params.num_reps-1) )
     combined_channel = ch_a.combine(ch_b)
-    combined_channel = combined_channel.combine(ch_c)
-    baselineML = Train_baselineML(combined_channel)
+    trained = Train(combined_channel)
 
     // evaluate                                                                                   
     baselineML
@@ -57,7 +59,7 @@ process Download_MODIS_fluxnet {
 
 
 process Preprocess_TEM() {
-    publishDir "${params.workdir}/Out/prep_TEM.sav", mode: 'copy'
+    publishDir "${params.workdir}/Out/", mode: 'copy'
     tag "prep_TEM"
     conda "${params.repo}/requirements.yml"
 
@@ -72,8 +74,26 @@ process Preprocess_TEM() {
 
 
 
+process Download_MODIS_global {
+    tag "download_modis_fluxnet_${rep}"
+    conda "${params.repo}/requirements.yml"
+
+    intput:
+    tuple path "prep_TEM.sav", int(rep)
+
+    output: path "modis_images_done.txt"
+
+    script:
+    """
+    python ${params.repo}/Code/Google_earth_engine/gee_pulldown_global.py ${rep}
+    echo "Done." > modis_images_done_${rep}.txt
+    """
+}
+
+
+
 process Preprocess_FLUXNET() {
-    publishDir "${params.workdir}/Out/prep_obs.sav", mode: 'copy'
+    publishDir "${params.workdir}/Out/", mode: 'copy'
     tag "prep_fluxnet"
     conda "${params.repo}/requirements.yml"
 
@@ -89,7 +109,7 @@ process Preprocess_FLUXNET() {
 
 
 process Preprocess_model() {
-    publishDir "${params.workdir}/Out/prep_model.sav", mode: 'copy'
+    publishDir "${params.workdir}/Out/", mode: 'copy'
     tag "prep_model"
     conda "${params.repo}/requirements.yml"
 
@@ -108,26 +128,28 @@ process Preprocess_model() {
 
 
 process Train_baselineML {
-#    publishDir "${params.workdir}/Out/Baseline_ML/", mode: 'copy'    
-#    tag "${test_index}_${rep}"
+    publishDir "${params.workdir}/Out/Baseline_ML/", mode: 'copy'    
+    tag "train_${test_index}_${rep}"
     conda "${params.repo}/requirements.yml"
 
     input:
- #   tuple val(workdir), val(test_index), val(rep), path "fluxnet_sim.sav", path "fluxnet_sim.sav"
+    tuple int(test_index), int(rep) prep_model.sav
 
     output:
- #   path "results_site_${test_index}_rep_${rep}.txt"
+    path "result_${test_index}_rep_${rep}.txt"
 
     script:
     """
     python ${params.repo}/Code/Model_stacking_CNN/preprocess.py
-        ${workdir} \
+        ${params.workdir} \
         ${test_index} \
         ${rep} \
         | grep "FINAL OUT" \
-        > "results_site_${test_index}_rep_${rep}.txt"
+        > "result_${test_index}_rep_${rep}.txt"
     """
 }
+
+
 
 process Eval {
     publishDir "${params.workdir}/Out/Baseline_ML/", mode: 'copy'
@@ -135,7 +157,7 @@ process Eval {
     conda "${params.repo}/requirements.yml"
 
     input:
-    tuple val(output_dir), val(plot_title), val(result_files)
+    path "result_${test_index}_rep_${rep}.txt"
 
     output:
     path "evaluation.pdf"
