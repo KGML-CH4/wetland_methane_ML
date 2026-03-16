@@ -17,13 +17,12 @@ from nn_architectures import pureML_GRU
 
 
 ### file paths
-wd = sys.argv[1]
-test_ind = int(sys.argv[2])
-rep = int(sys.argv[3])
-output_path = wd + "/Out/Baseline_ML/"
+test_ind = int(sys.argv[1])
+rep = int(sys.argv[2])
+output_path = config.wd + "/Out/Baseline_ML/"
 os.makedirs(output_path, exist_ok=True)
 finetune_path = output_path + "/finetune_baselineML_" + str(test_ind) + "_" + str(rep) + ".sav"  # separate filenames for each site/rep to allow parallel training
-sys.stderr.write("using working dir:" + wd + "\n")
+sys.stderr.write("using working dir:" + config.wd + "\n")
 
 
 
@@ -42,7 +41,7 @@ maxepoch=config.maxepoch
 
 
 ### load observed data
-fp = wd + "/Out/preprocessed_obs.sav"
+fp = config.wd + "/Out/preprocessed_obs.sav"
 data0 = torch.load(fp, weights_only=False)
 X_obs = data0['X']
 Y_obs = data0['Y']

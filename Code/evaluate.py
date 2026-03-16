@@ -16,10 +16,9 @@ import utils
 
 
 ### file paths                                                                            
-wd = sys.argv[1]
-output_path = sys.argv[2]
-plot_title = sys.argv[3]
-sys.stderr.write("using working dir:" + wd + "\n")
+output_path = sys.argv[1]
+plot_title = sys.argv[2]
+sys.stderr.write("using working dir:" + config.wd + "\n")
 
 
 
@@ -32,7 +31,7 @@ nonmissing_required = config.nonmissing_required
 
 
 ### load observed data
-fp = wd + "/Out/preprocessed_obs.sav"
+fp = config.wd + "/Out/preprocessed_obs.sav"
 data0 = torch.load(fp, weights_only=False)
 X_obs = data0['X']
 Y_obs = data0['Y']

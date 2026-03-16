@@ -9,19 +9,20 @@ import os
 ee.Authenticate()
 ee.Initialize(project=config.gee_cred)
 
-input_fp = "/Users/chris/TempWorkSpace/KGML/Data/Other_FLUXNET_data/fluxnet_emissions_HH.csv"
-output_folder = "/Users/chris/TempWorkSpace/KGML/Data/MODIS_061625/"
+# params                                                                                                                                               
+buffer_radius_m = 2500
+scale_m = 500
+input_fp = config.wd + "/Out/fluxnet_emissions_HH.csv"
+output_folder = config.wd + "/Out/MODIS_061625/"
 if not os.path.isdir(output_folder):
     os.mkdir(output_folder)
-
-
 
 def write_data(bands, input_fp):
     try:
         url = bands.getDownloadUrl({
             'region': window,
-#            'scale': scale_m,  # spatial resolution in meters/pixel (MCD43A4.061 is 500m resolution)
-            'format': 'Geo_TIFF',  # this is necessary for proper formatting, using python API
+            #'scale': scale_m,  # spatial resolution in meters/pixel (MCD43A4.061 is 500m resolution)
+            'format': 'Geo_TIFF',
             'crs': 'EPSG:3857',  # Web Mercator; meter units
             'dimensions': f"{pixel_dim}x{pixel_dim}",
         })
@@ -31,11 +32,10 @@ def write_data(bands, input_fp):
     except Exception:
         print(traceback.format_exc())
 
-        
 def get_collection(product, band, cent, start, end):    
     MODIS = (ee.ImageCollection(product)
              .filterBounds(cent)
-             .filterDate(start, end)  # this seems to work. two consecutive days might have the same data though
+             .filterDate(start, end)
              .select(band)
              .map(lambda img: img.clip(cent)))  # Even though filterBounds() reduces the number of images to those that overlap with your region, the images may still extend beyond your desired area. clip() ensures that only the part of each image within your window is kept
     MODIS = MODIS.map(datedist)  # getting dates of images (not all days have data)
@@ -47,16 +47,12 @@ def get_collection(product, band, cent, start, end):
     MODIS = MODIS.toBands()
     return MODIS, dates_list
 
+def datedist(img):
+    img = ee.Image(img)
+    date = img.get('system:time_start')
+    return img.set('DateDist', date)
 
-def datedist(img):  # https://medium.com/@riyad.jr359/time-efficient-timeseries-data-extraction-on-google-earth-engine-python-api-873ef4540bd4
- img = ee.Image(img)
- date = img.get('system:time_start')
- return img.set('DateDist', date)
-
-
-
-
-# read metadata - .csv
+### read metadata - .csv
 sites = {}
 with open(input_fp) as infile:
     header = infile.readline().strip().split(",")
@@ -71,15 +67,7 @@ with open(input_fp) as infile:
 #
 print("pulling from", len(sites), "sites:", sites.keys())
 
-
-            
-
-### params
-buffer_radius_m = 2500
-scale_m = 500
-
-
-
+### download
 counter = 0
 for site in sites:
     counter += 1
@@ -89,17 +77,15 @@ for site in sites:
     window = ee.Geometry.Point([lon, lat])
     window = window.buffer(buffer_radius_m)  # meters
     window = window.transform('EPSG:3857', maxError=1)  # read about what this does
-    pixel_dim = int((buffer_radius_m * 2) / scale_m)  # number of pixels along width/height
-    #print(f"Fixed output pixel dimensions: {pixel_dim} x {pixel_dim}")
+    pixel_dim = int((buffer_radius_m * 2) / scale_m)  # number of pixels along width/height  
 
-    # reformat the timestamp                                             
+    ### reformat the timestamp                                             
     start_time = "2006-01-01"
     end_time = "2018-12-31"
     start_time = ee.Date(start_time)
     end_time = ee.Date(end_time)
 
-    # reflectance (daily; 16day retrieval): https://developers.google.com/earth-engine/datasets/catalog/MODIS_061_MCD43A4#description
-    #print("1")
+    ### reflectance (daily; 16day retrieval): https://developers.google.com/earth-engine/datasets/catalog/MODIS_061_MCD43A4#description
     MODIS_BANDS = ['sur_refl_b01',
                    'sur_refl_b02',
                    'sur_refl_b03',

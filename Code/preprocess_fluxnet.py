@@ -13,8 +13,7 @@ import utils
 
 
 ### file paths
-wd = sys.argv[1]
-sys.stderr.write("using working dir:" + wd + "\n")   
+sys.stderr.write("using working dir:" + config.wd + "\n")   
 
 
 
@@ -26,14 +25,14 @@ days_per_month = config.days_per_month
 
 
 ### combine fluxnet data
-fp = wd + "/Out/"
+fp = config.wd + "/Out/"
 if not os.path.exists(fp):
     os.mkdir(fp)
 
 # read filelist
 sys.stderr.write("reading filelist\n")
 filelist = []
-fp = wd + "/Data/"
+fp = config.wd + "/Data/"
 for dirpath, dirnames, filenames in os.walk(fp):
     for f in filenames:
         if f[0:4] == "FLX_" and f[-8:] == "_1-1.csv" and "_FLUXNET-CH4_HH_" in f:
@@ -42,7 +41,7 @@ for dirpath, dirnames, filenames in os.walk(fp):
 # read site metadata
 sys.stderr.write("reading site metadata\n")
 sites = {}
-fp = wd + "/Data/FLX_AA-Flx_CH4-META_20201112135337801132_reformatted.csv"
+fp = config.wd + "/Data/FLX_AA-Flx_CH4-META_20201112135337801132_reformatted.csv"
 with open(fp) as infile:
     meta_header = infile.readline().strip().split(",")
     meta_header[0] = "SITE_ID"  # (addressing a weird formatting thing)
@@ -92,7 +91,7 @@ data = np.array(data)
 
 # write
 sys.stderr.write("writing output\n")
-fp = wd + "/Out/fluxnet_emissions_HH.csv"
+fp = config.wd + "/Out/fluxnet_emissions_HH.csv"
 header = np.array(header)[keep_indices]
 header = np.array(meta_header + list(header))
 with open(fp, "w") as outfile:
@@ -238,7 +237,7 @@ print(X_obs[:,ind])
 
 
 ### swap out site class for new classes
-fp = wd + "/Data/wetland_classification.txt"
+fp = config.wd + "/Data/wetland_classification.txt"
 wettypes = []
 with open(fp) as infile:
     for line in infile:
@@ -555,7 +554,7 @@ print(X_vars_obs)
 
 
 # # load simulated data
-# fp = wd + "Out/preprocessed_sim.sav"
+# fp = config.wd + "Out/preprocessed_sim.sav"
 # data0 = torch.load(fp, weights_only=False)
 # Y_sim = torch.tensor(data0['Y'])
 # Y_stats_sim = torch.tensor(data0['Y_stats'])
@@ -731,7 +730,7 @@ print(Z_obs.shape)
 X_obs=torch.tensor(X_obs)
 Y_obs=torch.tensor(Y_obs)
 Z_obs=torch.tensor(Z_obs)
-fp = wd + "/Out/preprocessed_obs.sav"
+fp = config.wd + "/Out/preprocessed_obs.sav"
 torch.save({'X': X_obs,
             'Y': Y_obs,
             'Z': Z_obs,

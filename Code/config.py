@@ -1,7 +1,7 @@
 import numpy as np
 
 # change
-wd = "temp_ch4"  # *** change ***                                                                   
+wd = "temp_ch4/"  # *** change ***                                                                   
 # general settings
 start_year, end_year = 2006,2018
 year_range = end_year-start_year+1
