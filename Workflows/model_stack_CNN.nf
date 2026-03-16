@@ -17,6 +17,9 @@ workflow {
     // preprocess FLUXNET
     Preprocess_FLUXNET()
 
+    // preprocess specific to model-stacking plus CNN
+    Preprocess_model()
+
     // train with baseline ML model                                                               
     ch_a = Channel.of(params.workdir)
     ch_b = Channel.of( 0..(params.num_sites-1) ) //0-index                                        
@@ -46,7 +49,7 @@ process Download_MODIS_fluxnet {
 
     script:
     """
-    python Code/Google_earth_engine/gee_pulldown_FLUXNET.py
+    python ${params.repo}/Code/Google_earth_engine/gee_pulldown_FLUXNET.py
     echo "Done." > modis_images_done.txt
     """
 }
@@ -63,7 +66,7 @@ process Preprocess_TEM() {
 
     script:
     """
-    python preprocess_TEM.py
+    python ${params.repo}/Code/preprocess_TEM.py
     """
 }
 
@@ -79,26 +82,45 @@ process Preprocess_FLUXNET() {
 
     script:
     """
-    python preprocess_fluxnet.py
+    python ${params.repo}/Code/preprocess_fluxnet.py
+    """
+}
+
+
+
+process Preprocess_model() {
+    publishDir "${params.workdir}/Out/prep_model.sav", mode: 'copy'
+    tag "prep_model"
+    conda "${params.repo}/requirements.yml"
+
+    input:
+    tuple path "modis_images_done.txt", path "prep_TEM.sav", path "prep_obs.sav"
+
+    output:
+    path "prep_model.sav"
+
+    script:
+    """
+    python ${params.repo}/Code/Model_stacking_CNN/preprocess.py
     """
 }
 
 
 
 process Train_baselineML {
-    publishDir "${params.workdir}/Out/Baseline_ML/", mode: 'copy'    
-    tag "${test_index}_${rep}"
+#    publishDir "${params.workdir}/Out/Baseline_ML/", mode: 'copy'    
+#    tag "${test_index}_${rep}"
     conda "${params.repo}/requirements.yml"
 
     input:
-    tuple val(workdir), val(test_index), val(rep), path "fluxnet_sim.sav", path "fluxnet_sim.sav"
+ #   tuple val(workdir), val(test_index), val(rep), path "fluxnet_sim.sav", path "fluxnet_sim.sav"
 
     output:
-    path "results_site_${test_index}_rep_${rep}.txt"
+ #   path "results_site_${test_index}_rep_${rep}.txt"
 
     script:
     """
-    python ${params.repo}/train_baselineML.py \
+    python ${params.repo}/Code/Model_stacking_CNN/preprocess.py
         ${workdir} \
         ${test_index} \
         ${rep} \
@@ -119,7 +141,7 @@ process Eval {
     path "evaluation.pdf"
     script:
     """                                                                                                                            
-    python ${params.repo}/evaluate.py \                                                                                            
+    python ${params.repo}/Code/evaluate.py \                                                                                            
         ${params.workdir} \                                                                                                        
         ${output_dir} \                                                                                                            
         "${plot_title}"                                                                                                            
