@@ -13,7 +13,7 @@ ee.Initialize(project=config.gee_cred)
 buffer_radius_m = 2500
 scale_m = 500
 input_fp = config.wd + "/Out/fluxnet_emissions_HH.csv"
-output_folder = config.wd + "/Out/MODIS_061625/"
+output_folder = config.wd + "/Out/MODIS_fluxnet/"
 if not os.path.isdir(output_folder):
     os.mkdir(output_folder)
 

@@ -14,6 +14,9 @@ workflow {
     // preprocess TEM and reanalysis data
     Preprocess_TEM()
 
+    // preprocess FLUXNET
+    Preprocess_FLUXNET()
+
     // train with baseline ML model                                                               
     ch_a = Channel.of(params.workdir)
     ch_b = Channel.of( 0..(params.num_sites-1) ) //0-index                                        
@@ -51,18 +54,35 @@ process Download_MODIS_fluxnet {
 
 
 process Preprocess_TEM() {
-    publishDir "${params.workdir}/Out/fluxnet_sim.sav", mode: 'copy'
-    tag "download_modis_fluxnet"
+    publishDir "${params.workdir}/Out/prep_TEM.sav", mode: 'copy'
+    tag "prep_TEM"
     conda "${params.repo}/requirements.yml"
 
     output:
-    path "fluxnet_sim.sav"
+    path "prep_TEM.sav"
 
     script:
     """
     python preprocess_TEM.py
     """
 }
+
+
+
+process Preprocess_FLUXNET() {
+    publishDir "${params.workdir}/Out/prep_obs.sav", mode: 'copy'
+    tag "prep_fluxnet"
+    conda "${params.repo}/requirements.yml"
+
+    output:
+    path "prep_obs.sav"
+
+    script:
+    """
+    python preprocess_fluxnet.py
+    """
+}
+
 
 
 process Train_baselineML {

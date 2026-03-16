@@ -30,7 +30,7 @@ import utils
 ### file paths
 input_path = config.wd + "/Data/"
 output_path = confif_wd + "/Out/"
-path_save_sim = output_path + '/fluxnet_sim.sav'
+path_save_sim = output_path + '/prep_TEM.sav'
 
 def load_predictor(fpath, header, target_year, ch4=False):
     print("loading predictor", fpath)

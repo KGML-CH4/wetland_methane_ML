@@ -41,7 +41,7 @@ maxepoch=config.maxepoch
 
 
 ### load observed data
-fp = config.wd + "/Out/preprocessed_obs.sav"
+fp = config.wd + "/Out/prep_obs.sav"
 data0 = torch.load(fp, weights_only=False)
 X_obs = data0['X']
 Y_obs = data0['Y']

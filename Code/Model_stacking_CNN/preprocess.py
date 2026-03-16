@@ -1,102 +1,128 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+# In[1]:
+
+
 import numpy as np
+from sklearn import tree
 import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
+from joblib import dump, load
+from sklearn.metrics import mean_squared_error
+from sklearn.metrics import r2_score
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.ensemble import GradientBoostingRegressor
 import torch
-from copy import deepcopy
+import pandas as pd
+from scipy.stats import gaussian_kde
+import scipy.stats as stats
+import geopandas 
+import scipy.io
+import shapely.geometry
+import netCDF4 as nc
 import sys
-import os
-import random
-import config
-import utils
+#from composition_stats import ilr
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
+import gc
+import rasterio
+from copy import deepcopy
+import matplotlib.ticker as ticker
+
+
+# In[2]:
+
+
+def Z_norm(X):
+    X_mean=np.nanmean(X)
+    X_std=np.nanstd(np.array(X))
+    return (X-X_mean)/X_std, X_mean, X_std
+
+
+# In[3]:
+
 
 ### file paths
-sys.stderr.write("using working dir:" + config.wd + "\n")   
-output = config.wd + "/Out/prep_obs.sav"
+model_version = "161"
 
-### load params
-start_year, end_year = config.start_year, config.end_year
+input_path = '/scratch.global/chriscs/KGML/Data/Emissions/'
+output_path = '/scratch.global/chriscs/KGML/Out/Emissions/v' + model_version + "/"
+#input_path = '/Users/chris/TempWorkSpace/KGML/Data/'
+#output_path = '/Users/chris/TempWorkSpace/KGML/Out/Emissions/'
+
+path_save_obs = output_path + 'fluxnet_obs_v' + model_version + '.sav'
+path_save_sim = output_path + 'fluxnet_sim_v' + model_version + '.sav'
+
+#modis_path = "/Users/chris/TempWorkSpace/MODOS_set6/"
+modis_path = input_path + "/MODIS_061625/"
+
+
+# In[4]:
+
+
+### params
+start_year, end_year = 2006,2018
+#start_year, end_year = 2010,2010
 year_range = end_year-start_year+1
-days_per_month = config.days_per_month
+days_per_month = [31,28,31,30,31,30,31,31,30,31,30,31]
 
-### combine fluxnet data
-fp = config.wd + "/Out/"
-if not os.path.exists(fp):
-    os.mkdir(fp)
+def coords2index(long, lat):
+    # long coords range (-180, 180); lat coords range (-90,90) verified bashing the data files
+    long_ind = long + 180  # (0,360)
+    lat_ind = lat + 90  # (0,180)
 
-# read filelist
-sys.stderr.write("reading filelist\n")
-filelist = []
-fp = config.wd + "/Data/"
-for dirpath, dirnames, filenames in os.walk(fp):
-    for f in filenames:
-        if f[0:4] == "FLX_" and f[-8:] == "_1-1.csv" and "_FLUXNET-CH4_HH_" in f:
-            filelist.append(dirpath + "/" + f)
+    # both lat and long have 1/2 degree increments = 720 indices for each.    
+    long_ind *= 2  # (0,720)
+    lat_ind *= 2  # (0,360)
 
-# read site metadata
-sys.stderr.write("reading site metadata\n")
-sites = {}
-fp = config.wd + "/Data/FLX_AA-Flx_CH4-META_20201112135337801132_reformatted.csv"
-with open(fp) as infile:
-    meta_header = infile.readline().strip().split(",")
-    meta_header[0] = "SITE_ID"  # (addressing a weird formatting thing)
-    #del meta_header[4]  # removing "UPLAND_CLASS" for now, lots of missing data  
-    for line in infile:
-        newline = line.strip().split(",")
-        siteid = newline[0]
-        #del newline[4]
-        sites[siteid] = newline
+    # integer indices
+    long_ind = int(long_ind)
+    lat_ind = int(lat_ind)
 
-# explore header information
-sys.stderr.write("exploring header info\n")
-header_info = {}
-for f in filelist:
-    with open(f) as infile:
-        header = infile.readline().strip().split(",")
-        for thing in header:
-            if thing not in header_info:
-                header_info[thing] = 0
-            header_info[thing] += 1
-keep_fields = {}  # for now usig vars shared across all sites/files
-for thing in header_info:
-    if header_info[thing] == len(filelist):
-        keep_fields[thing] = 0
+    return long_ind, lat_ind
 
-# loop through and get data (not memory efficient; but not memory limited, can run on macbook with other apps closed)
-data = []
-sys.stderr.write("looping through files and collecting data\n")
-for f in filelist:
-    sys.stderr.write("\t" + f + "\n")
-    siteid = f.split("/")[-1].split("_")[1]
-    keep_indices = []
-    current_data = []
-    with open(f) as infile:
-        header = infile.readline().strip().split(",")
-        for i in range(len(header)):
-            if header[i] in keep_fields:
-                keep_indices.append(i)
-        for line in infile:
-            newline = line.strip().split(",")
-            newline = np.array(list(map(float, newline)))
-            newline = newline[keep_indices]
-            newline = np.concatenate([np.array(sites[siteid]), newline])
-            data.append(newline)
-#
-data = np.array(data)
+def index2coords(long_ind, lat_ind):
+    long = float(long_ind) / 2.  # (0,360)
+    lat = float(lat_ind) / 2.  # (0,180)
+    long -= 180.  # (-180, 180)
+    lat -= 90.  # (-90, 90)
 
-# write
-sys.stderr.write("writing output\n")
-fp = config.wd + "/Out/fluxnet_emissions_HH.csv"
-header = np.array(header)[keep_indices]
-header = np.array(meta_header + list(header))
-with open(fp, "w") as outfile:
-    outfile.write(",".join(header) + "\n")
-    for line in data:
-        outfile.write(",".join(line) + "\n")
+    return long, lat
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[5]:
+
+
+##### observed FLUXNET data #####
+
+
+# In[6]:
+
 
 ### read fluxnet data
 X_obs = []
 counter = 0
-with open(fp) as infile:  #3,096,831 lines
+with open(input_path + "/fluxnet_emissions_HH.csv") as infile:  #3,096,831 lines
     X_vars_obs = np.array(infile.readline().strip().split(","))
     print(X_vars_obs)
     for line in infile:
@@ -121,6 +147,7 @@ print(len(set(list(X_obs[:,ind]))), set(list(X_obs[:,ind])))
 print(set(list(X_obs[:,3])))
 
 
+# In[7]:
 
 
 ### filter some vars   https://fluxnet.org/data/aboutdata/data-variables/
@@ -133,16 +160,53 @@ print(set(list(X_obs[:,3])))
 # 'FCH4_F_ANNOPTLM', 'FCH4_F_RANDUNC', 'FCH4_F_ANNOPTLM_UNC', 'FCH4_F_ANNOPTLM_QC']
 
 keepers = []
-keepers.append(list(X_vars_obs).index("SITE_ID"))  
-keepers.append(list(X_vars_obs).index("LAT"))  
-keepers.append(list(X_vars_obs).index("LON"))  
-keepers.append(list(X_vars_obs).index("SITE_CLASSIFICATION"))
-keepers.append(list(X_vars_obs).index("TIMESTAMP_START"))
-keepers.append(list(X_vars_obs).index("FCH4"))
-keepers.append(list(X_vars_obs).index("LE_F"))
-keepers.append(list(X_vars_obs).index("FCH4_F"))
-keepers.append(list(X_vars_obs).index("TA_F"))
-keepers.append(list(X_vars_obs).index("FCH4_F_ANNOPTLM"))
+keepers.append(0)  # SITE_ID
+keepers.append(1)  # lat 
+keepers.append(2)  # long
+keepers.append(3)  # site_classification
+#keepers.append(4)  # upland class
+#keepers.append(5)  # IGBP
+
+#keepers.append(6)  # KOPPEN
+#keepers.append(7)  # MOSS_Brown
+#keepers.append(8)  # MOSS_Sphagnum
+#keepers.append(9)  # AERENCHYMATOUS
+#keepers.append(10)  # ERI_SHRUB
+#keepers.append(11)  # TREE
+
+#keepers.append(12)  # DOM_VEG (not sure if we know this info for new grid cells)
+keepers.append(13)  # TIMESTAMP_START
+#keepers.append(14)  # TIMESTAMP_END
+#keepers.append(15)  # NEE. net ecosystem exchange (CO2)- using gap-filled version 
+#keepers.append(16)  # H.  Sensible heat flux — using gap-filled version 
+#keepers.append(17)  # LE. latent heat flux — using gap-filled version 
+keepers.append(18)  # FCH4. methane flux (raw)
+#keepers.append(19)  # USTAR. Friction velocity
+#keepers.append(20)  # SW_IN. Shortwave radiation, incoming
+#keepers.append(21)  # GPP_DT. Gross Primary Productivity (dont know what the "_DT" is)
+
+#keepers.append(22)  # RECO_DT. Ecosystem Respiration (dont know what the "_DT" is)
+#keepers.append(23)  # WS. wind speed — using gap-filled
+#keepers.append(24)  # NEE_F. net ecosystem exchange (CO2)
+#keepers.append(25)  # H_F.  Sensible heat flux
+keepers.append(26)  # LE_F. latent heat flux
+keepers.append(27)  # FCH4_F. response/target variable, gap-filled
+#keepers.append(28)  # SW_IN_F. Shortwave radiation, incoming
+#keepers.append(29)  # LW_IN_F. Longwave radiation, incoming
+# keepers.append(30)  # VPD_F. Vapor Pressure Deficit
+
+#keepers.append(31)  # PA_F. atmospheric pressure
+keepers.append(32)  # TA_F. air temp  "Gaps in meteorological variables including air temperature (TA), were filled with ERA-Interim (ERA-I) reanalysis data (Vuichard and Papale 2015)"
+# keepers.append(33)  # P_F. Precipitation
+#keepers.append(34)  # WS_F. wind speed
+#keepers.append(35)  # LE_F_ANNOPTLM - neural net filled
+# keepers.append(36)  # NEE_F_ANNOPTLM
+
+keepers.append(37)  # FCH4_F_ANNOPTLM
+# keepers.append(38)  # FCH4_F_RANDUNC
+# keepers.append(39)  # FCH4_F_ANNOPTLM_UNC
+# keepers.append(40)  # FCH4_F_ANNOPTLM_QC
+
 print(keepers)
 X_vars_obs = X_vars_obs[keepers]
 X_obs = X_obs[:, keepers]
@@ -151,6 +215,16 @@ print(len(X_vars_obs))
 print(X_obs.shape)
 
 
+# In[8]:
+
+
+# # np.save(output_path+"temp1.npy", X_obs)
+# # np.save(output_path+"temp2.npy", X_vars_obs)
+# X_obs = np.load(output_path+"temp1.npy")
+# X_vars_obs = np.load(output_path+"temp2.npy")
+
+
+# In[9]:
 
 
 ### convert FLUXNET units to match sims
@@ -228,17 +302,12 @@ X_obs[:,ind] = deepcopy(obs)
 print(X_obs[:,ind])
 
 
+# In[10]:
 
 
-### swap out site class for new classes
-fp = config.wd + "/Data/wetland_classification.txt"
-wettypes = []
-with open(fp) as infile:
-    for line in infile:
-        newline = line.strip().split()
-        wettypes.append(np.array(newline))
-#
-wettypes = np.array(wettypes)                        
+### swap out site class for new classes                                                                                                 
+wettypes = np.genfromtxt(input_path + '/wetland_classification.txt',dtype='str')
+print(wettypes)
 print(wettypes.shape)
 print(X_vars_obs)
 siteid_ind = list(X_vars_obs).index("SITE_ID")
@@ -274,6 +343,7 @@ print(list(X_obs[:,class_ind]).count("3"))
 print(list(X_obs[:,class_ind]).count("4"))
 
 
+# In[11]:
 
 
 ### one-hot vtype
@@ -284,7 +354,7 @@ keep_inds.remove(ind)  # remove the previous column
 data = np.array(X_obs[:,ind])
 print(data.shape)
 #cats = list(set(list(data)))
-cats = [1,2,3,4]
+cats = list(range(0 +1,4 +1))  # UPDATE
 print(len(cats), cats)
 new_static = np.zeros((X_obs.shape[0], len(cats)))
 for cat in range(len(cats)):  
@@ -305,6 +375,7 @@ print(len(X_vars_obs))
 print(X_vars_obs)
 
 
+# In[12]:
 
 
 ### wrap into a time series
@@ -364,7 +435,159 @@ X_obs = np.array(X3d)
 print(X_obs.shape)
 
 
+# In[13]:
 
+
+# # np.save(output_path+"temp1.npy", X_obs)
+# # np.save(output_path+"temp2.npy", X_vars_obs)
+# X_obs = np.load(output_path+"temp1.npy")
+# X_vars_obs = np.load(output_path+"temp2.npy")
+
+
+# In[ ]:
+
+
+### read in MODIS data
+
+# fxn to turn yyyy-mm-dd date into 13yr index
+def process_dates(dates):
+    timepoints = {}
+    for i in range(len(dates)):
+        timepoint = dates[i].split("-")
+        timepoint = list(map(int,timepoint))
+        y = (timepoint[0]-start_year) * 365
+        m = np.sum(days_per_month[:timepoint[1]-1])
+        d = timepoint[2] - 1
+        timepoint = int(y + m + d)  # sometimes float don't know why
+        timepoints[timepoint] = i  # key: day of the year where there is data.  
+                                   # value: the index of the corresponding image
+    return timepoints
+
+def fill_gaps(gappy_data, dates):
+    timepoints = process_dates(dates)
+    filled_data = []
+    for date in range(365*year_range):
+        up,down = int(date),int(date)
+        counter = 0
+        while up not in timepoints and down not in timepoints:
+            up += 1
+            down -= 1
+            counter += 1
+            if counter > 365:
+                print("bug")
+                sys.exit()
+        #
+        if up in timepoints and down in timepoints:  # tie
+            tp1 = timepoints[up]
+            tp2 = timepoints[down] 
+            v1 = gappy_data[tp1]
+            v2 = gappy_data[tp2]
+            datum = np.array([v1,v2])  # stacks the two arrays, creating new dimension (0)
+            datum = np.nanmean(datum, axis=0)
+        elif up in timepoints:
+            tp1 = timepoints[up]
+            datum = gappy_data[tp1]
+        elif down in timepoints:
+            tp1 = timepoints[down]
+            datum = gappy_data[tp1]
+        else:
+            print("bug, this shouldn't happen")
+            sys.exit()
+        #
+        filled_data.append( datum )
+
+    #
+    filled_data = np.array(filled_data)
+    #
+    return filled_data
+
+def modland_bits(val):
+    bits = np.binary_repr(val, width=32)[::-1]  # reverse order
+    return bits[0:2]  # only looking at first two bits
+
+bands = ["sur_refl_b01",
+         "sur_refl_b02",
+         "sur_refl_b03",
+         "sur_refl_b04",
+         "sur_refl_b05",
+         "sur_refl_b06",
+         "sur_refl_b07",
+        ]
+
+QC_band = "QA"
+ind = list(X_vars_obs).index("SITE_ID")
+I_obs = []
+for b in range(len(bands)):
+    print("\t", bands[b])
+    new_band = []
+    for site in range(X_obs.shape[0]):        
+        site_ID = site_dict_rev[np.nanmax(X_obs[site,:,ind])] 
+        print(site, site_ID)
+
+        # read data
+        fp = site_ID + "_" + bands[b]
+        with rasterio.open(modis_path +fp + ".tif") as src:
+            data = src.read()
+    
+        # read QC
+        fp = site_ID + "_" + QC_band
+        with rasterio.open(modis_path + fp + ".tif") as src:
+            qc = src.read()
+        v_modland_bits = np.vectorize(modland_bits)
+        qc = v_modland_bits(qc)
+        qc = (qc == '00')  # this means all bands are ideal quality
+        
+        # filter
+        data = np.where(qc, data, np.nan)
+        
+        # fill gaps
+        timestamps = np.load(modis_path + fp + ".npy")
+        #print(site_ID, year, bands[b], data.shape, len(timestamps))
+        data = fill_gaps(data, timestamps).astype(float)  # one site, of one band
+        
+        #
+        new_band.append(data)  # combining sites (one band)
+    #
+    new_band = np.array(new_band)
+    I_obs.append(new_band)  # combining bands (all sites)
+#
+I_obs = np.stack(I_obs, axis = 2)
+print(I_obs.shape)  # (sites, timesteps, bands, width, height)
+
+
+# In[20]:
+
+
+### visualize one image
+
+for i in range(0,100):
+    print(i)
+    fp = site_ID + "_sur_refl_b01"
+    with rasterio.open(modis_path +fp + ".tif") as src:
+        r = src.read()[i]
+    fp = site_ID + "_sur_refl_b04"
+    with rasterio.open(modis_path +fp + ".tif") as src:
+        g = src.read()[i]
+    fp = site_ID + "_sur_refl_b03"
+    with rasterio.open(modis_path +fp + ".tif") as src:
+        b = src.read()[i]
+    #
+    rgb = np.stack((r,g,b), axis=-1)
+    rgb = rgb / rgb.max()
+    plt.imshow(rgb)
+    plt.axis('off')
+    plt.show()
+
+
+# In[27]:
+
+
+# # # np.save(output_path+"temp5.npy", I_obs)
+# I_obs = np.load(output_path+"temp5.npy")
+# print(I_obs.shape)
+
+
+# In[28]:
 
 
 ### replace -9999 with nan in BOTH predictors and ch4 (later, we will convert back; this is for filtering out negative fluxes)
@@ -376,10 +599,13 @@ X_obs[np.where(X_obs==-9999)] = np.nan
 print(np.sum(np.isnan(X_obs)))
 print(len(np.where(X_obs == -9999)[0]))
 
+# (I_obs is already nan)
 
 
+# In[29]:
 
-### monthly average
+
+### monthly average (X)
 print(X_obs.shape)
 print(X_vars_obs)
 one_day = 48
@@ -423,10 +649,50 @@ X_obs = np.array(newX)
 print(X_obs.shape)
 
 
+# In[30]:
+
+
+### monthly average (I)
+print(I_obs.shape)
+one_day = 1
+one_year = one_day * 365
+total_months = 12 * year_range
+num_vars = I_obs.shape[2]
+image_width = I_obs.shape[-1]
+newX = np.empty((num_sites, total_months, num_vars, image_width, image_width))
+
+for year in range(year_range):
+    print(year)
+    for month in range(12): 
+        start = (year*one_year)  # year
+        if month > 0:
+            start += np.sum(days_per_month[:month]) * one_day  # month
+        length_current_month = days_per_month[month] * one_day
+        end = start + length_current_month
+        month_index = year*12 + month
+
+        for site in range(num_sites):
+            data = I_obs[site, start:end, :, :, :]
+            # print(data.shape)  # (31, 2, 10, 10)
+            
+            # fill the current month with means of each variable— nan, or not.
+            means = np.nanmean(data, axis = 0)
+            newX[site, month_index, :, :, :] = means
+
+            # make nan where X is nan
+            if np.isnan(X_obs[site, month_index, :]).any() is True:
+                newX[site, month_index, :, :, :] = np.nan
+
+I_obs = np.array(newX)
+print(I_obs.shape)
+
+
+# In[31]:
 
 
 ### offset southern hemisphere by 6 months
 print(X_obs.shape)
+print(I_obs.shape)
 shift_size = 6  # six months
 lat_ind = list(X_vars_obs).index("LAT")
 for site in range(num_sites):
@@ -435,8 +701,20 @@ for site in range(num_sites):
         shifted = deepcopy(X_obs[site,shift_size:,:])  # new var of shifted data
         X_obs[site,:,:] = np.nan  # replace old var with nans
         X_obs[site,0:-shift_size,:] = deepcopy(shifted)  # shove in shifted data
+        #
+        shifted = deepcopy(I_obs[site,shift_size:,:])  # new var of shifted data
+        I_obs[site,:,:,:,:] = np.nan  # replace old var with nans
+        I_obs[site,0:-shift_size,:,:,:] = deepcopy(shifted)  # shove in shifted data
 
 
+# In[32]:
+
+
+### augment modis images
+print(I_obs.shape)
+
+
+# In[33]:
 
 
 ### separate out Z: site, lat, long
@@ -453,6 +731,7 @@ print(X_vars_obs.shape)
 print(X_obs.shape)
 
 
+# In[34]:
 
 
 ### separate Y and X
@@ -474,28 +753,39 @@ print(X_vars_obs.shape)
 print(X_obs.shape)
 
 
+# In[35]:
 
 
-### rearrange vars to match sims
+# ### rearrange vars to match sims
 
-# sim vars
-# ['LE' 'temp' 'site_class_1' 'site_class_2' 'site_class_3' 'site_class_4']
+# # sim vars
+# # ['LE' 'temp' 'site_class_1' 'site_class_2' 'site_class_3' 'site_class_4']
 
-#     0       1         2               3              4              5              
-#
-# obs vars
-# ['FCH4' 'LE_F' 'TA_F' 'FCH4_F_ANNOPTLM' 'site_class_1' 'site_class_2' 'site_class_3' 'site_class_4']
+# #     0       1         2               3              4              5              
+# #
+# # obs vars
+# # ['FCH4' 'LE_F' 'TA_F' 'FCH4_F_ANNOPTLM' 'site_class_1' 'site_class_2' 'site_class_3' 'site_class_4']
 
-#     0     1      2            3               4              5            6                7
+# #     0     1      2            3               4              5            6                7
 
-inds = [1, 2, 4, 5, 6, 7, 0, 3]  # indices vector
-X_obs = X_obs[:, :, inds]
-X_vars_obs = X_vars_obs[inds]
-print(X_obs.shape)
-print(len(X_vars_obs))
-print(X_vars_obs)
+# inds = [1, 2, 4, 5, 6, 7, 0, 3]  # indices vector
+# X_obs = X_obs[:, :, inds]
+# X_vars_obs = X_vars_obs[inds]
+# print(X_obs.shape)
+# print(len(X_vars_obs))
+# print(X_vars_obs)
 
 
+# In[36]:
+
+
+# np.save(output_path+"temp3.npy", X_obs)
+# np.save(output_path+"temp4.npy", X_vars_obs)
+# X_obs = np.load(output_path+"temp3.npy")
+# X_vars_obs = np.load(output_path+"temp4.npy")
+
+
+# In[37]:
 
 
 # ### time series plot
@@ -517,15 +807,15 @@ print(X_vars_obs)
 #     offset = 0
 
 #     data = deepcopy(X_obs[site, timearr, ind_precip])
-#     data,_,_ = utils.Z_norm(data)
+#     data,_,_ = Z_norm(data)
 #     ax.plot(timearr-offset, data, "o-", label="precip", color='blue')
 
 #     data = deepcopy(X_obs[site, timearr, ind_temp])
-#     data,_,_ = utils.Z_norm(data)
+#     data,_,_ = Z_norm(data)
 #     ax.plot(timearr-offset, data, "o-", label="air_temp", color='red')
 
 #     data = deepcopy(Y_obs[site, timearr])
-#     data,_,_ = utils.Z_norm(data)
+#     data,_,_ = Z_norm(data)
 #     ax.plot(timearr-offset, data, "o-", label="ch4 flux", color='green')
     
 #     ax.set_xlim((timearr[0]-offset,timearr[-1]-offset))
@@ -540,23 +830,29 @@ print(X_vars_obs)
 # #fig.savefig("/Users/chris/TempWorkSpace/ch4_" + site + ".pdf", bbox_inches='tight')
 
 
+# In[38]:
 
 
 ##### add TEM output as predictor #####
 
 
+# In[39]:
 
 
 # # load simulated data
-# fp = config.wd + "Out/preprocessed_sim.sav"
+# fp="/scratch.global/chriscs/KGML/Out/Emissions/fluxnet_sim_v1.sav"
 # data0 = torch.load(fp, weights_only=False)
+# X_sim = torch.tensor(data0['X'])
 # Y_sim = torch.tensor(data0['Y'])
 # Y_stats_sim = torch.tensor(data0['Y_stats'])
+# X_stats_sim = torch.tensor(data0['X_stats'])
 # Z_sim = data0['Z']
+# X_vars_sim = data0['X_vars']
 # Z_vars_sim = data0['Z_vars']
 # # Y_stats = data0['Y_stats']
 # print(Y_sim.shape, flush=True)
 # print(Z_sim.shape, flush=True)
+# print(X_vars_sim, flush=True)
 # print(Z_vars_sim, flush=True)
 
 # # convert -9999 to nan
@@ -567,6 +863,7 @@ print(X_vars_obs)
 # print(len(np.where(Y_sim == -9999)[0]))
 
 
+# In[40]:
 
 
 # ### align by lat long
@@ -579,65 +876,59 @@ print(X_vars_obs)
 # new_Y = []
 # new_Z = []
 # new_TEM = []
-
-# # prep sim coords
-# lat_ind = list(Z_vars_sim).index("lat")
-# long_ind = list(Z_vars_sim).index("long")  
-# lat_sim = np.nanmax(Z_sim[:,:,lat_ind], axis = 1)
-# long_sim = np.nanmax(Z_sim[:,:,long_ind], axis =1)
-# coords_sim = [utils.coords2index(lon, lat) for lon, lat in zip(long_sim, lat_sim)]
-# coords_sim = np.array(coords_sim)
-# long_sim,lat_sim = coords_sim[:,0],coords_sim[:,1]
-
-# # loop through obs sites
 # for site in range(num_sites):
 #     print(site)
 #     lat_ind = list(Z_vars_obs).index("LAT")
 #     long_ind = list(Z_vars_obs).index("LON")
-#     lat_obs = np.nanmax(Z_obs[site,:,lat_ind])
-#     long_obs = np.nanmax(Z_obs[site,:,long_ind])
-#     long_obs,lat_obs = utils.coords2index(long_obs, lat_obs)
-    
-#     # direct hits
-#     hit = np.where((lat_sim == lat_obs) & (long_sim == long_obs))[0]
+#     lat = np.nanmax(Z_obs[site,:,lat_ind])
+#     long = np.nanmax(Z_obs[site,:,long_ind])
+#     # print(lat, long)
+#     lat = np.floor(lat*2)/2
+#     long = np.floor(long*2)/2
+#     # print(lat, long)
 
-#     # open up to consider nearby grid cells.
-#     if len(hit) == 0:  
+#     # # print(np.where((Z_sim==lat) & (Z_sim==long)))
+#     # print(np.where((Z_sim==lat) & (Z_sim==long)))
+#     lat_ind = list(Z_vars_sim).index("lat")
+#     long_ind = list(Z_vars_sim).index("long")        
+#     hit = np.where((Z_sim[:,0,lat_ind] == lat) & (Z_sim[:,0,long_ind] == long))[0]
+#     if len(hit) == 0:  # opening up to considering nearby grid cells.
 #         done = False
 #         radius = 0
 #         while done == False:
 #             radius += 0.5
-#             hit = np.where((lat_sim >= lat_obs-radius) & 
-#                            (lat_sim <= lat_obs+radius) &
-#                            (long_sim >= long_obs-radius) &
-#                            (long_sim <= long_obs+radius))[0]
+#             hit = np.where((Z_sim[:,0,lat_ind] >= lat-radius) & 
+#                            (Z_sim[:,0,lat_ind] <= lat+radius) &
+#                            (Z_sim[:,0,long_ind] >= long-radius) &
+#                            (Z_sim[:,0,long_ind] <= long+radius))[0]
 #             if len(hit) > 0:
 #                 done = True
 #                 # for h in hit:
 #                 #     coords = Z_sim[h,0,:].numpy()
 #                 #     print(coords[1], coords[0])
-#         # randomize hits
-#         random.shuffle(hit)
+
 #     #
+#     # print(Z_sim[hit[0],0,:].numpy())
 #     hits.append(hit[0])  # in cases with multiple hits just taking the first (random) one
-
-#     # add TEM estimate to X
+#     #obs_data = Y_obs[site, :, 0]
 #     sim_data = Y_sim[hit[0], :]
+#     # sim_data = np.expand_dims(sim_data, axis=1)
 #     new_TEM.append(np.array(sim_data))
-
-#     # 
-#     new_data = np.concatenate([X_obs[site],sim_data], axis=1)    
-
-#     # # don't add flux (avoid doing this, leave for train.ipynb)    
-#     # new_data = np.array(X_obs[site])
-    
+#     # new_data = np.concatenate([X_obs[site],sim_data], axis=1)
+#     new_data = np.array(X_obs[site])
 #     new_X.append(new_data)
 #     new_data = np.array(Y_obs[site])        
 #     new_Y.append(new_data)
 #     new_data = np.array(Z_obs[site])        
 #     new_Z.append(new_data)
-#     locs.append([lat_obs, long_obs])
+#     #print(obs_data.shape, sim_data.shape, np.array([obs_data, sim_data]).shape)
+#     #Y.append(np.array([obs_data, sim_data]))
+#     locs.append([lat, long])
 
+
+    
+#     #print()
+        
 
 # #
 # print(len(hits), len(set(hits)))  # I guess repeated hits means flux towers fall inside the same grid cell?
@@ -649,10 +940,11 @@ print(X_vars_obs)
 # print(Y_obs.shape)
 # print(Z_obs.shape)
 # print(TEM_data.shape)
-# X_vars_obs = np.append(X_vars_obs, "tem_flux")
+# # X_vars_obs = np.append(X_vars_obs, "tem_flux")
 # print(X_vars_obs)
 
 
+# In[41]:
 
 
 # ### time series plot
@@ -664,11 +956,11 @@ print(X_vars_obs)
 #     offset = 0
 
 #     data = deepcopy(Y_obs[site, timearr])
-#     # data,_,_ = utils.Z_norm(data)
+#     # data,_,_ = Z_norm(data)
 #     ax.plot(timearr-offset, data, "o-", label="observed", color='blue')
 
 #     data = deepcopy(TEM_data[site, timearr, 0])
-#     # data,_,_ = utils.Z_norm(data)
+#     # data,_,_ = Z_norm(data)
 #     data = (data * Y_stats_sim[0,1].numpy()) + Y_stats_sim[0,0].numpy()
 #     ax.plot(timearr-offset, data, "o-", label="TEM", color='red')
     
@@ -684,54 +976,174 @@ print(X_vars_obs)
 # #fig.savefig("/Users/chris/TempWorkSpace/ch4_" + site + ".pdf", bbox_inches='tight')
 
 
+# In[42]:
 
 
-### z-norm
+### z-norm obs INDEPENDENT of sims
 Y_obs = np.reshape(Y_obs, (Y_obs.shape[0],Y_obs.shape[1],1))
     
 X_stats = np.zeros((X_obs.shape[-1], 2))
 Y_stats = np.zeros((1, 2))  
+I_stats = np.zeros((I_obs.shape[2], 2))
 
 for v in range(1):
     var = np.nanvar(Y_obs[:,:,v])
     print(v, var)
-    Y_obs[:,:,v], Y_stats[v,0], Y_stats[v,1] = utils.Z_norm(Y_obs[:,:,v])
-print()
+    Y_obs[:,:,v], Y_stats[v,0], Y_stats[v,1] = Z_norm(Y_obs[:,:,v])
 
+print()
 for v in range(len(X_vars_obs)):
     var = np.nanvar(X_obs[:,:,v])
     print(v, var)
     if var > 0:
-        X_obs[:,:,v], X_stats[v,0], X_stats[v,1] = utils.Z_norm(X_obs[:,:,v])
+        X_obs[:,:,v], X_stats[v,0], X_stats[v,1] = Z_norm(X_obs[:,:,v])
+    else:
+        print("ZERO VARIANCE COLUMN")
+
+print()
+for v in range(I_obs.shape[2]):
+    var = np.nanvar(I_obs[:,:,v,:,:])
+    print(v, var)
+    if var > 0:
+        I_obs[:,:,v,:,:], I_stats[v,0], I_stats[v,1] = Z_norm(I_obs[:,:,v,:,:])
     else:
         print("ZERO VARIANCE COLUMN")
 
 
+# In[43]:
 
 
 ### replace nan with -9999 (for the GRU)
 X_obs = np.nan_to_num(X_obs, nan=-9999)
 Y_obs = np.nan_to_num(Y_obs, nan=-9999)
+I_obs = np.nan_to_num(I_obs, nan=-9999)
 
 
+# In[44]:
 
 
 ### save the data
+
 print(X_obs.shape)
 print(Y_obs.shape)
 print(Z_obs.shape)
+print(I_obs.shape)
 
 X_obs=torch.tensor(X_obs)
 Y_obs=torch.tensor(Y_obs)
 Z_obs=torch.tensor(Z_obs)
+I_obs=torch.tensor(I_obs)
 torch.save({'X': X_obs,
             'Y': Y_obs,
             'Z': Z_obs,
+            'I': I_obs,
             'X_stats': X_stats,
             'Y_stats': Y_stats,
+            'I_stats': I_stats,
             'X_vars': X_vars_obs,
             'Y_vars': Y_vars_obs,
             'Z_vars': Z_vars_obs,
-            }, outpath)
+            }, path_save_obs)
 
-print("\ndone.")
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
