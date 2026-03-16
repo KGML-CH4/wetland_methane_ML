@@ -11,6 +11,9 @@ workflow {
     // download MODIS images
     Download_MODIS_fluxnet()
 
+    // preprocess TEM and reanalysis data
+    Preprocess_TEM()
+
     // train with baseline ML model                                                               
     ch_a = Channel.of(params.workdir)
     ch_b = Channel.of( 0..(params.num_sites-1) ) //0-index                                        
@@ -36,14 +39,30 @@ process Download_MODIS_fluxnet {
     conda "${params.repo}/requirements.yml"
 
     output:
-    path "modis_images_done"
+    path "modis_images_done.txt"
 
     script:
     """
     python Code/Google_earth_engine/gee_pulldown_FLUXNET.py
+    echo "Done." > modis_images_done.txt
     """
 }
 
+
+
+process Preprocess_TEM() {
+    publishDir "${params.workdir}/Out/fluxnet_sim.sav", mode: 'copy'
+    tag "download_modis_fluxnet"
+    conda "${params.repo}/requirements.yml"
+
+    output:
+    path "fluxnet_sim.sav"
+
+    script:
+    """
+    python preprocess_TEM.py
+    """
+}
 
 
 process Train_baselineML {
@@ -52,7 +71,7 @@ process Train_baselineML {
     conda "${params.repo}/requirements.yml"
 
     input:
-    tuple val(workdir), val(test_index), val(rep)
+    tuple val(workdir), val(test_index), val(rep), path "fluxnet_sim.sav", path "fluxnet_sim.sav"
 
     output:
     path "results_site_${test_index}_rep_${rep}.txt"
