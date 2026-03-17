@@ -16,41 +16,43 @@ workflow {
 
     // download MODIS images for 0.5 degree grid cells
     ch_a = Channel.of( 1..40 )
-    Download_MODIS_global(ch_a)
+    modis = Download_MODIS_global(ch_a)
+    modis = modis.collect()
 
     // preprocess global MODIS images
-    ch_a = Channel.of( 1..XX )
-    prep_modis = Prep_MODIS_global_1(ch_a)
+    ch_b = Channel.of( 1..1000 )
+    prep_modis = Prep_MODIS_global_1(modis, ch_b)
     prep_modis = prep_modis.collect()
     prep_modis = Prep_MODIS_global_2(prep_modis)
-    prep_modis = Prep_MODIS_global_3(prep_modis)
+    ch_c = Channel.of( 1..1000 )
+    prep_modis = Prep_MODIS_global_3(prep_modis, ch_c)
     prep_modis = prep_modis.collect()
-    Prep_MODIS_global_4(prep_modis)
+    modis_prepped = Prep_MODIS_global_4(prep_modis)
 
     // preprocess FLUXNET
-    Preprocess_FLUXNET()
+    prep_fluxnet = Preprocess_FLUXNET(modis_prepped)
 
     // preprocess specific to model-stacking plus CNN
-    Preprocess_model()
+    prep_model = Preprocess_model(prep_fluxnet)
 
     // train
-    ch_a = Channel.of( 1..(params.num_sites) )
-    ch_b = Channel.of( 1..(params.num_reps) )
-    combined_channel = ch_a.combine(ch_b)
-    trained = Train(combined_channel)
+    ch_d = Channel.of( 1..(params.num_sites) )
+    ch_e = Channel.of( 1..(params.num_reps) )
+    combined_channel = ch_d.combine(ch_e)
+    trained = Train(prep_model, combined_channel)
 
     // evaluate
     trained = trained.collect()
-    Eval(trained)
+    test = Eval(trained)
 
-    // preprocess for upscaling
-    Preprocess_upscale()
+    // preprocess for upscaling (using separate wetland map)
+    prep_upscale = Preprocess_upscale_WAD2M(test)
 
     // predict every grid cell
-    Upscale()
+    upscaled = Upscale(prep_upscale)
 
     // final upscaling analysis and plots
-    Global_plot()
+    Global_plot(upscaled)
     
 }
 
@@ -236,5 +238,21 @@ process Eval {
     """                                                                                                                            
     python ${params.repo}/Code/evaluate.py \
         "Cross domain model stacking"                                                                                                            
+    """
+}
+
+
+
+proces Preprocess_upscale_WAD2M {
+    publishDir "${params.workdir}/Out/Model_stack_CNN/", mode: 'copy'
+    tag "preprocess_upscale_wad2m"
+    conda "${params.repo}/requirements.yml"
+
+    output:
+    path "prep_upscale_WAD2M.sav"
+
+    script:
+    """
+    python ${params.repo}/Code/Model_stack_CNN/preprocess_upscale_WAD2M.py
     """
 }
