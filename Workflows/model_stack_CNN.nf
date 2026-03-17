@@ -11,12 +11,23 @@ workflow {
     // download MODIS images at fluxnet sites
     Download_MODIS_fluxnet()
 
+    // preprocess TEM and reanalysis data
+    Preprocess_TEM()
+
     // download MODIS images for 0.5 degree grid cells
     ch_a = Channel.of( 1..40 )
     Download_MODIS_global(ch_a)
 
-    // preprocess TEM and reanalysis data
-    Preprocess_TEM()
+    // preprocess global MODIS images
+    ch_a = Channel.of( 1..XX )
+    prep_modis = Prep_MODIS_global_1(ch_a)
+    prep_modis = prep_modis.collect()
+    #fanout = allsims.flatMap { it }  // emits (e.g., 51k) tuples from the single, collected list; extract first element from each
+    #chunks = fanout.collate(chunkSize, remainder=true)
+    prep_modis = Prep_MODIS_global_2(prep_modis)
+    prep_modis = Prep_MODIS_global_3(prep_modis)
+    prep_modis = prep_modis.collect()
+    Prep_MODIS_global_4(prep_modis)
 
     // preprocess FLUXNET
     Preprocess_FLUXNET()
@@ -38,6 +49,16 @@ workflow {
         }
         .set { inpt }
     Eval(inpt)
+
+    // preprocess for upscaling
+    Preprocess_upscale()
+
+    // predict every grid cell
+    Upscale()
+
+    // final upscaling analysis and plots
+    Global_plot()
+    
 }
 
 
@@ -81,12 +102,74 @@ process Download_MODIS_global {
     intput:
     tuple path "prep_TEM.sav", int(rep)
 
-    output: path "modis_images_done.txt"
+    output: path "modis_images_done_${rep}.txt"
 
     script:
     """
     python ${params.repo}/Code/Google_earth_engine/gee_pulldown_global.py ${rep}
     echo "Done." > modis_images_done_${rep}.txt
+    """
+}
+
+
+
+process Prep_MODIS_global_1 {
+    tag "prep_modis_global_1_${rep}"
+    conda "${params.repo}/requirements.yml"
+
+    output: path "modis_prep1_done.txt"
+
+    script:
+    """
+    python ${params.repo}/Code/Google_earth_engine/prep_MODIS_step1.py ${rep}
+    echo "Done." > modis_prep1_done_${rep}.txt
+    """
+}
+
+
+
+process Prep_MODIS_global_2 {
+    tag "prep_modis_global_2"
+    conda "${params.repo}/requirements.yml"
+
+    output: path "modis_prep2_done.txt"
+
+    script:
+    """
+    python ${params.repo}/Code/Google_earth_engine/prep_MODIS_step2.py
+    echo "Done." > modis_prep2_done.txt
+    """
+}
+
+
+
+
+process Prep_MODIS_global_3 {
+    tag "prep_modis_global_3_${rep}"
+    conda "${params.repo}/requirements.yml"
+
+    output: path "modis_prep3_done.txt"
+
+    script:
+    """
+    python ${params.repo}/Code/Google_earth_engine/prep_MODIS_step3.py ${rep}
+    echo "Done." > modis_prep3_done_${rep}.txt
+    """
+}
+
+
+
+process Prep_MODIS_global_4 {
+    publishDir "${params.workdir}/Out/MODIS_tiles_TEM/Preprocessed_tiles/", mode: 'copy'
+    tag "prep_modis_global_4"
+    conda "${params.repo}/requirements.yml"
+
+    output: path "global_SDs.npy"
+
+    script:
+    """
+    python ${params.repo}/Code/Google_earth_engine/prep_MODIS_step4.py ${rep}
+    echo "Done." > modis_prep4_done_${rep}.txt
     """
 }
 

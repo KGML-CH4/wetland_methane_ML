@@ -62,7 +62,7 @@ for i in range(rep*n, (rep*n)+n):
     if i < len(coords):  # not all i's exist
         site = shuffled_indices[i]
         print("site", site, flush=True)
-        folder = output_folder + "site_" + str(site)
+        folder = output_folder + "/site_" + str(site)
         if not os.path.isdir(folder):
             os.mkdir(folder)
 
