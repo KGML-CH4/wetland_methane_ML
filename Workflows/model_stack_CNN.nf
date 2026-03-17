@@ -33,20 +33,15 @@ workflow {
     // preprocess specific to model-stacking plus CNN
     Preprocess_model()
 
-    // train with baseline ML model                                                               
+    // train
     ch_a = Channel.of( 1..(params.num_sites) )
     ch_b = Channel.of( 1..(params.num_reps) )
     combined_channel = ch_a.combine(ch_b)
     trained = Train(combined_channel)
 
-    // evaluate                                                                                   
-    baselineML
-        .collect()
-        .map { result_files ->
-            tuple("${params.workdir}/Out/Baseline_ML/", "Baseline machine learning", result_files)
-        }
-        .set { inpt }
-    Eval(inpt)
+    // evaluate
+    trained = trained.collect()
+    Eval(trained)
 
     // preprocess for upscaling
     Preprocess_upscale()
@@ -231,20 +226,15 @@ process Train {
 
 process Eval {
     publishDir "${params.workdir}/Out/Model_stack_CNN/", mode: 'copy'
-    tag "eval_baselineML"
+    tag "eval"
     conda "${params.repo}/requirements.yml"
-
-    input:
-    path "result_${test_index}_rep_${rep}.txt"
 
     output:
     path "evaluation.pdf"
     
     script:
     """                                                                                                                            
-    python ${params.repo}/Code/Model_stacking_CNNevaluate.py \
-        ${params.workdir} \                                                                                                        
-        ${output_dir} \                                                                                                            
-        "${plot_title}"                                                                                                            
+    python ${params.repo}/Code/evaluate.py \
+        "Cross domain model stacking"                                                                                                            
     """
 }
