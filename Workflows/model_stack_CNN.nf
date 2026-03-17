@@ -22,8 +22,6 @@ workflow {
     ch_a = Channel.of( 1..XX )
     prep_modis = Prep_MODIS_global_1(ch_a)
     prep_modis = prep_modis.collect()
-    #fanout = allsims.flatMap { it }  // emits (e.g., 51k) tuples from the single, collected list; extract first element from each
-    #chunks = fanout.collate(chunkSize, remainder=true)
     prep_modis = Prep_MODIS_global_2(prep_modis)
     prep_modis = Prep_MODIS_global_3(prep_modis)
     prep_modis = prep_modis.collect()
@@ -36,8 +34,8 @@ workflow {
     Preprocess_model()
 
     // train with baseline ML model                                                               
-    ch_a = Channel.of( 0..(params.num_sites-1) ) //0-index                                        
-    ch_b = Channel.of( 0..(params.num_reps-1) )
+    ch_a = Channel.of( 1..(params.num_sites) )
+    ch_b = Channel.of( 1..(params.num_reps) )
     combined_channel = ch_a.combine(ch_b)
     trained = Train(combined_channel)
 
@@ -210,32 +208,29 @@ process Preprocess_model() {
 
 
 
-process Train_baselineML {
-    publishDir "${params.workdir}/Out/Baseline_ML/", mode: 'copy'    
+process Train {
+    publishDir "${params.workdir}/Out/Model_stack_CNN/", mode: 'copy'    
     tag "train_${test_index}_${rep}"
     conda "${params.repo}/requirements.yml"
 
     input:
-    tuple int(test_index), int(rep) prep_model.sav
+    tuple int(test_index), int(rep), path prep_model.sav
 
     output:
     path "result_${test_index}_rep_${rep}.txt"
 
     script:
     """
-    python ${params.repo}/Code/Model_stacking_CNN/preprocess.py
-        ${params.workdir} \
+    python ${params.repo}/Code/Model_stacking_CNN/train.py
         ${test_index} \
-        ${rep} \
-        | grep "FINAL OUT" \
-        > "result_${test_index}_rep_${rep}.txt"
+        ${rep}
     """
 }
 
 
 
 process Eval {
-    publishDir "${params.workdir}/Out/Baseline_ML/", mode: 'copy'
+    publishDir "${params.workdir}/Out/Model_stack_CNN/", mode: 'copy'
     tag "eval_baselineML"
     conda "${params.repo}/requirements.yml"
 
@@ -244,9 +239,10 @@ process Eval {
 
     output:
     path "evaluation.pdf"
+    
     script:
     """                                                                                                                            
-    python ${params.repo}/Code/evaluate.py \                                                                                            
+    python ${params.repo}/Code/Model_stacking_CNNevaluate.py \
         ${params.workdir} \                                                                                                        
         ${output_dir} \                                                                                                            
         "${plot_title}"                                                                                                            

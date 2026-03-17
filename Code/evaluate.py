@@ -36,24 +36,11 @@ data0 = torch.load(fp, weights_only=False)
 X_obs = data0['X']
 Y_obs = data0['Y']
 Z_obs = data0['Z']
-print(X_obs.shape)
-print(Y_obs.shape)
-print(Z_obs.shape)
 X_vars_obs = data0['X_vars']
 Y_vars_obs = data0['Y_vars']
-print(Y_vars_obs, flush=True)
 Z_vars_obs = data0['Z_vars']
 X_stats = data0['X_stats']
 Y_stats = data0['Y_stats']
-print(X_vars_obs, flush=True)
-#print(Y_vars, flush=True)
-print(Z_vars_obs, flush=True)
-print(X_vars_obs, flush=True)
-print(X_obs.shape, flush=True)
-print(Y_obs.shape, flush=True)
-print(Z_obs.shape, flush=True)
-
-
 
 ### Separate out F_CH4 (into variable "M")
 
@@ -62,18 +49,11 @@ mind = list(X_vars_obs).index("FCH4")
 M_obs = deepcopy(X_obs[:,:,mind])
 M_vars_obs = deepcopy(X_vars_obs[mind])
 M_stats = deepcopy(X_stats[mind, :])
-print(M_vars_obs, M_obs.shape, M_stats)
 
 # remove from X
 X_obs = np.delete(X_obs, mind, axis=2)
 X_vars_obs = np.delete(X_vars_obs, mind)
 X_stats = np.delete(X_stats, mind, axis=0)
-
-print(X_obs.shape)
-print(X_vars_obs)
-print(X_stats.shape)
-
-
 
 ### Separate out FCH4_F_ANNOPTLM (into variable "G")
 
@@ -82,25 +62,13 @@ gind = list(X_vars_obs).index("FCH4_F_ANNOPTLM")
 G_obs = X_obs[:,:,gind]
 G_vars_obs = X_vars_obs[gind]
 G_stats = deepcopy(X_stats[gind, :])
-print(G_vars_obs, G_obs.shape, G_stats)
 
 # remove from X
 X_obs = np.delete(X_obs, gind, axis=2)
 X_vars_obs = np.delete(X_vars_obs, gind)
 X_stats = np.delete(X_stats, gind, axis=0)
 
-print(X_obs.shape)
-print(X_vars_obs)
-print(X_stats.shape)
-
-
-
 ### prep and filter time windows
-print(X_obs.shape)
-print(Y_obs.shape)
-print(Z_obs.shape)
-print(M_obs.shape)
-print(G_obs.shape)
  
 # chunk up train sites into windows
 new_X, new_Y, new_Z, new_M, new_G = [],[],[],[],[]
@@ -109,12 +77,11 @@ for site in range(num_sites):
     new_site_x, new_site_y, new_site_z, new_site_m, new_site_g = [],[],[],[],[]
     for it in range(num_windows):
         window_range_in = range(timesteps_per_year*it,timesteps_per_year*it+(timesteps_per_year*2))  # window of (smaller) input
-        x_piece = X_obs[site, window_range_in, :]#.to(device)
-        y_piece = Y_obs[site, window_range_in, 0]#.to(device)
-        z_piece = Z_obs[site, window_range_in, :]#.to(device)
-        m_piece = M_obs[site, window_range_in]#.to(device)
-        g_piece = G_obs[site, window_range_in]#.to(device)
-        # print(x_piece.shape, y_piece.shape, z_piece.shape)  # torch.Size([24, 6]) torch.Size([24]) torch.Size([24, 3])
+        x_piece = X_obs[site, window_range_in, :]
+        y_piece = Y_obs[site, window_range_in, 0]
+        z_piece = Z_obs[site, window_range_in, :]
+        m_piece = M_obs[site, window_range_in]
+        g_piece = G_obs[site, window_range_in]
 
         # year 1
         x_piece_1 = x_piece[0:timesteps_per_year, :]
@@ -148,10 +115,7 @@ for site in range(num_sites):
 
         # third check: do we have enough months with non-missing data in year 2?
         if torch.sum(y_missing_2) <= (timesteps_per_year-nonmissing_required):
-            #print(np.sum(np.array(np.isnan(y_piece))))
-            #y_piece = torch.nan_to_num(y_piece, nan=-999)  # replace nan with -999 for the custom loss
             y_piece = np.expand_dims(y_piece, axis=-1)
-            #print(x_piece.shape, y_piece.shape, z_piece.shape)
             new_site_x.append(x_piece)
             new_site_y.append(y_piece)
             new_site_z.append(z_piece)
@@ -168,16 +132,12 @@ for site in range(num_sites):
     new_Z.append(torch.tensor(np.array(new_site_z)))
     new_M.append(torch.tensor(np.array(new_site_m)))
     new_G.append(torch.tensor(np.array(new_site_g)))
-
+#
 X_obs_windows = list(new_X)
 Y_obs_windows = list(new_Y)
 Z_obs_windows = list(new_Z)
 M_obs_windows = list(new_M)
 G_obs_windows = list(new_G)
-print(len(X_obs_windows), len(Y_obs_windows), len(Z_obs_windows), len(M_obs_windows), len(G_obs_windows))
-print(X_obs_windows[0].shape, Y_obs_windows[0].shape, Z_obs_windows[0].shape, M_obs_windows[0].shape, G_obs_windows[0].shape)
-
-
 
 ### initial organization
 num_sites = X_obs.shape[0]

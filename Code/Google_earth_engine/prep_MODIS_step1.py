@@ -16,7 +16,7 @@ rep = int(sys.argv[1])
 input_path = config.wd + '/Data/'
 output_path = config.wd + '/Out/'
 modis_path = input_path + "/MODIS_global/"
-output_folder = modis_path + "/Intermediate_step1_preprocessing/"
+output_folder = modis_path + "/Out/Intermediate_step1_preprocessing/"
 if not os.path.isdir(output_folder):
     os.mkdir(output_folder)
 

@@ -14,6 +14,7 @@ num_windows = int(np.floor((timesteps-24)/12+1))
 nonmissing_required = 4
 lr_adam = 0.001
 bsz_obs = 10
+bsz_sim = 1000
 patience=10
 factor=0.5
 maxepoch=100

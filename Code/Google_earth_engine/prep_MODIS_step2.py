@@ -4,8 +4,8 @@ import torch
 import os
 import config
 
-input_folder = config.wd + "/MODIS_tiles_TEM/Intermediate_step1_preprocessing/"
-output_folder = config.wd + "/MODIS_tiles_TEM/Preprocessed_tiles/"
+input_folder = config.wd + "/Out/MODIS_tiles_TEM/Intermediate_step1_preprocessing/"
+output_folder = config.wd + "/Out/MODIS_tiles_TEM/Preprocessed_tiles/"
 
 ### load TEM grid cells                                                              
 TEM_preprocess_path = config.wd + "/Out/prep_TEM.sav"

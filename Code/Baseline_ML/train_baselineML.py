@@ -9,10 +9,8 @@ import torch.optim as optim
 import random
 import sys
 from copy import deepcopy
-# helper functions
 import config
 import utils
-import helper_train
 from nn_architectures import pureML_GRU
 
 
@@ -219,19 +217,19 @@ shuffled_ind = torch.randperm(len(X_temp))
 
 # X
 trainf=0.7; vf=0.3; testf=0
-X_train, X_val, _ = helper_train.split_data_group(X_temp,shuffled_ind, train_frac=trainf, val_frac=vf, test_frac=testf)
+X_train, X_val, _ = utils.split_data_group(X_temp,shuffled_ind, train_frac=trainf, val_frac=vf, test_frac=testf)
 print(X_train.size(), X_val.size(), flush=True)
 
 # Y
-Y_train, Y_val, _  = helper_train.split_data_group(Y_temp,shuffled_ind, train_frac=trainf, val_frac=vf, test_frac=testf)
+Y_train, Y_val, _  = utils.split_data_group(Y_temp,shuffled_ind, train_frac=trainf, val_frac=vf, test_frac=testf)
 print(Y_train.size(), Y_val.size(), flush=True)
 
 # Z
-Z_train, Z_val, _  = helper_train.split_data_group(Z_temp,shuffled_ind, train_frac=trainf, val_frac=vf, test_frac=testf)
+Z_train, Z_val, _  = utils.split_data_group(Z_temp,shuffled_ind, train_frac=trainf, val_frac=vf, test_frac=testf)
 print(Z_train.size(), Z_val.size(), flush=True)
 
 # M
-M_train, M_val, _  = helper_train.split_data_group(M_temp,shuffled_ind, train_frac=trainf, val_frac=vf, test_frac=testf)
+M_train, M_val, _  = utils.split_data_group(M_temp,shuffled_ind, train_frac=trainf, val_frac=vf, test_frac=testf)
 print(M_train.size(), M_val.size(), flush=True)
 
 
@@ -258,8 +256,8 @@ optimizer = optim.Adam(model.parameters(), lr=lr_adam) #add weight decay normall
 # scheduler
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=patience, factor=factor)
 
-# initialize some varts
-loss_val_best = 500000
+# initialize some vars
+loss_val_best = 999999
 best_epoch = 9999
 train_losses = []
 val_losses = []
