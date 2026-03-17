@@ -32,18 +32,9 @@ from skimage.measure import block_reduce
 import config
 import utils
 
-### file paths
-model_version = "/model_stack_CNN/"
-input_path = config.wd + "/Data/"
-output_path = config.wd + "/Out/"+ model_version
-path_save_sim = output_path + 'prep_upscale_WAD2M.sav'
-modis_path = config.wd + "/Out/MODIS_global/"
-
 ### params
 start_year, end_year = config.start_year, config.end_year
 year_range = config.year_range
-
-
 
 def load_predictor(fpath, header, target_year, ch4=False):
     print("loading predictor", fpath)
@@ -73,7 +64,7 @@ def load_predictor(fpath, header, target_year, ch4=False):
                 
                 # process ch4 data uniquely
                 if ch4 == True:
-                    data *= -1  # flip sign (TEM emissions are negative -Youmi)
+                    data *= -1  # flip sign (TEM emissions are negative)
                     
                     # check for duplicates (doing this row-wise is intentional; because <31-day months will have nan for 31st day. The missing vals are rare, never whole row.)
                     start = ((month-1)*31)  # range of days covered by current row
@@ -128,8 +119,7 @@ def divide_frin(X, FRIN):
 
 def load_siteclass(header):
     print("loading site classification")
-    fp = input_path + "/wet1x1.tem"
-    data = np.genfromtxt(input_path + "/wet1x1.tem", delimiter=',')
+    data = np.genfromtxt(config.fp_wetland_map, delimiter=',')
     counter = 0
     var = np.full((720, 360, 12*31, 1), np.nan)
     long_ind = header.index("LONG")
@@ -240,8 +230,7 @@ def load_LE(fp):
     return data
 
 ### load NEW wetland types
-fp = input_path + "wetlandtype.nc"    
-nc_file = nc.Dataset(fp)  
+nc_file = nc.Dataset(config.fp_wetland_type)  
 wc = nc_file['wetlandtype']  # (360, 720)
 wc = np.array(wc)
 
@@ -330,12 +319,12 @@ for year in range(start_year, end_year+1):
     variables = []
 
     # ch4 INTENSITY
-    fpath = input_path + "/TEM_intensity/CH4_emission_intensity_" + str(year) + ".nc"
+    fpath = config.fp_intensity + "/CH4_emission_intensity_" + str(year) + ".nc"
     var = load_intensity(fpath, year)
     var = np.expand_dims(var, axis=-1)
     
     # scale by NEW frin
-    fpath = input_path + "WAD2M_wetlands_2000-2020_025deg_Ver2.0.nc"    
+    fpath = config.fp_WAD2M_map
     NEWFRIN = load_newFRIN(fpath, year)  # (important to rename variable here because of the above if/else statement)
     var *= NEWFRIN
     variables.append(var)  # add the updated-ch4 to list
@@ -343,7 +332,7 @@ for year in range(start_year, end_year+1):
     # LE (era5)
     var = []
     for month in range(12):
-        fpath = input_path + 'LE_land/era5_slhf_monthly_' + str(year) + "_" + str(month+1).zfill(2) + '.nc'  # original
+        fpath = config.fp_le + '/era5_slhf_monthly_' + str(year) + "_" + str(month+1).zfill(2) + '.nc'  # original
         var.append(load_LE(fpath))
     var = np.concatenate(var, axis = 2)
     var = np.reshape(var, (720, 360, 372))
@@ -351,7 +340,7 @@ for year in range(start_year, end_year+1):
     variables.append(var)
 
     # temperature
-    fpath = input_path + "ecmwf_TAIR_1979-2018.tem"
+    fpath = config.fp_tair
     header = ["LONG", "LAT", "VAR_NAME", "DONTKNOW", "YEAR", "MONTH", "SUM", "min", "mean", "max"]
     T = load_predictor(fpath, header, year)
     variables.append(T)
@@ -493,4 +482,4 @@ torch.save({'X': torch.tensor(X),
             'X_vars': X_vars,
             'Y_vars': Y_vars,
             'Z_vars': Z_vars,
-            }, path_save_sim)
+            }, config.fp_upscale_prep)

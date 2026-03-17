@@ -9,10 +9,6 @@ import random
 import config
 import utils
 
-### file paths
-sys.stderr.write("using working dir:" + config.wd + "\n")   
-output = config.wd + "/Out/prep_obs.sav"
-
 ### load params
 start_year, end_year = config.start_year, config.end_year
 year_range = end_year-start_year+1
@@ -35,15 +31,12 @@ for dirpath, dirnames, filenames in os.walk(fp):
 # read site metadata
 sys.stderr.write("reading site metadata\n")
 sites = {}
-fp = config.wd + "/Data/FLX_AA-Flx_CH4-META_20201112135337801132_reformatted.csv"
-with open(fp) as infile:
+with open(meta) as infile:
     meta_header = infile.readline().strip().split(",")
     meta_header[0] = "SITE_ID"  # (addressing a weird formatting thing)
-    #del meta_header[4]  # removing "UPLAND_CLASS" for now, lots of missing data  
     for line in infile:
         newline = line.strip().split(",")
         siteid = newline[0]
-        #del newline[4]
         sites[siteid] = newline
 
 # explore header information
@@ -61,7 +54,7 @@ for thing in header_info:
     if header_info[thing] == len(filelist):
         keep_fields[thing] = 0
 
-# loop through and get data (not memory efficient; but not memory limited, can run on macbook with other apps closed)
+# loop through and get data
 data = []
 sys.stderr.write("looping through files and collecting data\n")
 for f in filelist:
@@ -85,10 +78,9 @@ data = np.array(data)
 
 # write
 sys.stderr.write("writing output\n")
-fp = config.wd + "/Out/fluxnet_emissions_HH.csv"
 header = np.array(header)[keep_indices]
 header = np.array(meta_header + list(header))
-with open(fp, "w") as outfile:
+with open(config.fp_fluxnet_raw, "w") as outfile:
     outfile.write(",".join(header) + "\n")
     for line in data:
         outfile.write(",".join(line) + "\n")
@@ -96,9 +88,8 @@ with open(fp, "w") as outfile:
 ### read fluxnet data
 X_obs = []
 counter = 0
-with open(fp) as infile:  #3,096,831 lines
+with open(config.fp_fluxnet_raw) as infile:  #3,096,831 lines
     X_vars_obs = np.array(infile.readline().strip().split(","))
-    print(X_vars_obs)
     for line in infile:
         counter += 1
         if counter % 100000 == 0:
@@ -112,15 +103,7 @@ with open(fp) as infile:  #3,096,831 lines
         #
         X_obs.append(np.array(newline))
 X_obs = np.array(X_obs)
-
-print(X_vars_obs)
-print(len(X_vars_obs))
-print(X_obs.shape)
 ind = list(X_vars_obs).index("SITE_ID")
-print(len(set(list(X_obs[:,ind]))), set(list(X_obs[:,ind])))
-print(set(list(X_obs[:,3])))
-
-
 
 
 ### filter some vars   https://fluxnet.org/data/aboutdata/data-variables/
@@ -143,32 +126,17 @@ keepers.append(list(X_vars_obs).index("LE_F"))
 keepers.append(list(X_vars_obs).index("FCH4_F"))
 keepers.append(list(X_vars_obs).index("TA_F"))
 keepers.append(list(X_vars_obs).index("FCH4_F_ANNOPTLM"))
-print(keepers)
 X_vars_obs = X_vars_obs[keepers]
 X_obs = X_obs[:, keepers]
-print(X_vars_obs)
-print(len(X_vars_obs))
-print(X_obs.shape)
-
 
 
 
 ### convert FLUXNET units to match sims
-
-
 ## neural-net-filled flux
 # grab flux column
 ind = list(X_vars_obs).index("FCH4_F_ANNOPTLM")
 obs = deepcopy(X_obs[:,ind])
 obs = obs.astype(float)
-print(len(obs))
-
-# checking for -9999
-print(np.min(obs))
-print("-9999 strings", len(obs[obs == "-9999.0"]))
-print("-9999 floats", len(obs[obs == -9999.0]))    # these exist for the non-gap filled version; the other is completely gap-filled
-print("nans", np.sum(np.isnan(obs)))
-   # none!
 
 # # change obs units to match sims
 # #  (TEM) mg / day  (FLUXNET) nmol / s    s/day   mol/nmol   g/mol    mg/g    
@@ -177,73 +145,41 @@ print("nans", np.sum(np.isnan(obs)))
 obs = obs * (100. / 72.2)
 
 X_obs[:,ind] = deepcopy(obs)
-print(X_obs[:,ind])
-
-
 
 ## gap-filled flux:
 # grab flux column
 ind = list(X_vars_obs).index("FCH4_F")
 obs = deepcopy(X_obs[:,ind])
 obs = obs.astype(float)
-print(len(obs))
-
-# checking for -9999
-print(np.min(obs))
-print("-9999 strings", len(obs[obs == "-9999.0"]))
-print("-9999 floats", len(obs[obs == -9999.0]))    # these exist for the non-gap filled version; the other is completely gap-filled
-print("nans", np.sum(np.isnan(obs)))
 
 # convert -9999 to nan
 obs[obs == -9999] = np.nan
-print("-9999 floats", len(obs[obs == -9999.0]))    # these exist for the non-gap filled version; the other is completely gap-filled
-print("nans", np.sum(np.isnan(obs)))
 
 obs = obs * (100. / 72.2)
 X_obs[:,ind] = deepcopy(obs)
-print(X_obs[:,ind])
-
-
 
 ## non-gap-filled flux
 # grab flux column
 ind = list(X_vars_obs).index("FCH4")
 obs = deepcopy(X_obs[:,ind])
 obs = obs.astype(float)
-print(len(obs))
-
-# checking for -9999
-print(np.min(obs))
-print("-9999 strings", len(obs[obs == "-9999.0"]))
-print("-9999 floats", len(obs[obs == -9999.0]))    # these exist for the non-gap filled version; the other is completely gap-filled
-print("nans", np.sum(np.isnan(obs)))
 
 # convert -9999 to nan
 obs[obs == -9999] = np.nan
-print("-9999 floats", len(obs[obs == -9999.0]))    # these exist for the non-gap filled version; the other is completely gap-filled
-print("nans", np.sum(np.isnan(obs)))
 
 obs = obs * (100. / 72.2)
 X_obs[:,ind] = deepcopy(obs)
-print(X_obs[:,ind])
-
-
-
 
 ### swap out site class for new classes
-fp = config.wd + "/Data/wetland_classification.txt"
 wettypes = []
-with open(fp) as infile:
+with open(config.fp_wetland_class) as infile:
     for line in infile:
         newline = line.strip().split()
         wettypes.append(np.array(newline))
 #
 wettypes = np.array(wettypes)                        
-print(wettypes.shape)
-print(X_vars_obs)
 siteid_ind = list(X_vars_obs).index("SITE_ID")
 class_ind = list(X_vars_obs).index("SITE_CLASSIFICATION")
-print(siteid_ind, class_ind)
 for row in range(X_obs.shape[0]):
     if row % 250000 == 0:
         print(row)
@@ -267,29 +203,17 @@ for row in range(X_obs.shape[0]):
         print("missing wetland class", row, site, classi)
         sys.exit()
 
-print(set(list(X_obs[:,class_ind])))
-print(list(X_obs[:,class_ind]).count("1"))
-print(list(X_obs[:,class_ind]).count("2"))
-print(list(X_obs[:,class_ind]).count("3"))
-print(list(X_obs[:,class_ind]).count("4"))
-
-
-
-
 ### one-hot vtype
 ind = list(X_vars_obs).index('SITE_CLASSIFICATION')
 keep_inds = list(range(len(X_vars_obs)))
 new_vars = []
 keep_inds.remove(ind)  # remove the previous column 
 data = np.array(X_obs[:,ind])
-print(data.shape)
 #cats = list(set(list(data)))
 cats = [1,2,3,4]
-print(len(cats), cats)
 new_static = np.zeros((X_obs.shape[0], len(cats)))
 for cat in range(len(cats)):  
     new_col = np.equal(data, str(cats[cat]))
-    print(cats[cat], np.sum(new_col))
     new_static[:,cat] = np.array(new_col)
     #new_vars.append(v+"_"+str(cat))  # this way re-codes the vtype to a new index
     new_vars.append("site_class_"+str(int(cats[cat])))  # original value (intended to be at least)
@@ -300,13 +224,6 @@ X_obs = np.concatenate([X_obs, new_static], axis=1)
 X_vars_obs = np.array(X_vars_obs)[keep_inds]  # update vars
 X_vars_obs = list(X_vars_obs) + new_vars
 
-print(X_obs.shape)
-print(len(X_vars_obs))
-print(X_vars_obs)
-
-
-
-
 ### wrap into a time series
 
 # initialize 3d array
@@ -315,7 +232,6 @@ num_vars = X_obs.shape[1]
 num_half_hours = year_range * 365 * 48   # years * days per year * half-hours per day
 X3d = np.empty((num_sites, num_half_hours, num_vars), dtype = "float32")
 X3d[:] = np.nan  # initialize with nans
-print(X3d.shape)
 
 # wrap
 timeindex = list(X_vars_obs).index("TIMESTAMP_START")
@@ -369,19 +285,9 @@ print(X_obs.shape)
 
 ### replace -9999 with nan in BOTH predictors and ch4 (later, we will convert back; this is for filtering out negative fluxes)
 #   this comes AFTER starting a new array that is numeric (and allows nans)
-
-print(np.sum(np.isnan(X_obs)))
-print(len(np.where(X_obs == -9999)[0]))
 X_obs[np.where(X_obs==-9999)] = np.nan
-print(np.sum(np.isnan(X_obs)))
-print(len(np.where(X_obs == -9999)[0]))
-
-
-
 
 ### monthly average
-print(X_obs.shape)
-print(X_vars_obs)
 one_day = 48
 one_year = one_day * 365
 total_months = 12 * year_range
@@ -390,7 +296,6 @@ newX = np.empty((num_sites, total_months, num_vars))
 ind_FCH4 = list(X_vars_obs).index("FCH4")
 
 for year in range(year_range):
-    print(year)
     for month in range(12): 
         start = (year*one_year)  # year
         if month > 0:
@@ -420,13 +325,8 @@ for year in range(year_range):
                 newX[site,month_index,ind_FCH4] = np.nan
 
 X_obs = np.array(newX)
-print(X_obs.shape)
-
-
-
 
 ### offset southern hemisphere by 6 months
-print(X_obs.shape)
 shift_size = 6  # six months
 lat_ind = list(X_vars_obs).index("LAT")
 for site in range(num_sites):
@@ -443,38 +343,16 @@ for site in range(num_sites):
 zinds = [list(X_vars_obs).index('SITE_ID')] + [list(X_vars_obs).index('LAT')] + [list(X_vars_obs).index('LON')]
 Z_obs = X_obs[:,:,zinds]
 Z_vars_obs = X_vars_obs[zinds]
-print(Z_vars_obs)
-print(Z_obs.shape)
-
 X_obs = np.delete(X_obs, zinds, axis=2)
 X_vars_obs = np.delete(X_vars_obs, zinds)
-print(X_vars_obs)
-print(X_vars_obs.shape)
-print(X_obs.shape)
-
-
-
 
 ### separate Y and X
 yind = list(X_vars_obs).index("FCH4_F")
 Y_obs = X_obs[:,:,yind]
 Y_vars_obs = X_vars_obs[yind]
-print(Y_vars_obs, Y_obs.shape)
 
 X_obs = np.delete(X_obs, yind, axis=2)
 X_vars_obs = np.delete(X_vars_obs, yind)
-
-# # remove the extra flux column too
-# yind = list(X_vars_obs).index("FCH4")
-# X_obs = np.delete(X_obs, yind, axis=2)
-# X_vars_obs = np.delete(X_vars_obs, yind)
-
-print(X_vars_obs)
-print(X_vars_obs.shape)
-print(X_obs.shape)
-
-
-
 
 ### rearrange vars to match sims
 
@@ -491,199 +369,6 @@ print(X_obs.shape)
 inds = [1, 2, 4, 5, 6, 7, 0, 3]  # indices vector
 X_obs = X_obs[:, :, inds]
 X_vars_obs = X_vars_obs[inds]
-print(X_obs.shape)
-print(len(X_vars_obs))
-print(X_vars_obs)
-
-
-
-
-# ### time series plot
-# ind_precip = list(X_vars_obs).index("P_F")
-# ind_temp = list(X_vars_obs).index("TA_F")
-
-# for site in range(num_sites):
-#     fig, ax = plt.subplots(1, 1,figsize=(30, 5*1))
-#     plt.rcParams.update({'font.size': 22})
-#     # units="(TEM units)"
-#     timearr=np.arange(X_obs.shape[1])    
-
-#     # # offset southern hemisphere
-#     # lat = np.nanmax(Z_obs[site,:,1])
-#     # if lat > 0:     
-#     #     offset = 0
-#     # else:
-#     #     offset = 6
-#     offset = 0
-
-#     data = deepcopy(X_obs[site, timearr, ind_precip])
-#     data,_,_ = utils.Z_norm(data)
-#     ax.plot(timearr-offset, data, "o-", label="precip", color='blue')
-
-#     data = deepcopy(X_obs[site, timearr, ind_temp])
-#     data,_,_ = utils.Z_norm(data)
-#     ax.plot(timearr-offset, data, "o-", label="air_temp", color='red')
-
-#     data = deepcopy(Y_obs[site, timearr])
-#     data,_,_ = utils.Z_norm(data)
-#     ax.plot(timearr-offset, data, "o-", label="ch4 flux", color='green')
-    
-#     ax.set_xlim((timearr[0]-offset,timearr[-1]-offset))
-#     ax.set_xlabel("time (months)")
-#     # ax.set_ylabel(units)
-#     ax.set_title(str(round(np.nanmax(Z_obs[site,:,1]),3)) + ", " + str(round(np.nanmax(Z_obs[site,:,2]),3)))
-#     ax.grid()
-#     ax.xaxis.set_major_locator(ticker.MultipleLocator(12))
-#     ax.legend()
-#     plt.show()
-
-# #fig.savefig("/Users/chris/TempWorkSpace/ch4_" + site + ".pdf", bbox_inches='tight')
-
-
-
-
-##### add TEM output as predictor #####
-
-
-
-
-# # load simulated data
-# fp = config.wd + "Out/preprocessed_sim.sav"
-# data0 = torch.load(fp, weights_only=False)
-# Y_sim = torch.tensor(data0['Y'])
-# Y_stats_sim = torch.tensor(data0['Y_stats'])
-# Z_sim = data0['Z']
-# Z_vars_sim = data0['Z_vars']
-# # Y_stats = data0['Y_stats']
-# print(Y_sim.shape, flush=True)
-# print(Z_sim.shape, flush=True)
-# print(Z_vars_sim, flush=True)
-
-# # convert -9999 to nan
-# print(torch.sum(np.isnan(Y_sim)))
-# print(len(np.where(Y_sim == -9999)[0]))
-# Y_sim[np.where(Y_sim==-9999)] = np.nan
-# print(torch.sum(np.isnan(Y_sim)))
-# print(len(np.where(Y_sim == -9999)[0]))
-
-
-
-
-# ### align by lat long
-# print(X_obs.shape)
-# num_sites = Y_obs.shape[0]
-# num_timepoints = Y_obs.shape[1]
-# hits = []
-# locs = []
-# new_X = []
-# new_Y = []
-# new_Z = []
-# new_TEM = []
-
-# # prep sim coords
-# lat_ind = list(Z_vars_sim).index("lat")
-# long_ind = list(Z_vars_sim).index("long")  
-# lat_sim = np.nanmax(Z_sim[:,:,lat_ind], axis = 1)
-# long_sim = np.nanmax(Z_sim[:,:,long_ind], axis =1)
-# coords_sim = [utils.coords2index(lon, lat) for lon, lat in zip(long_sim, lat_sim)]
-# coords_sim = np.array(coords_sim)
-# long_sim,lat_sim = coords_sim[:,0],coords_sim[:,1]
-
-# # loop through obs sites
-# for site in range(num_sites):
-#     print(site)
-#     lat_ind = list(Z_vars_obs).index("LAT")
-#     long_ind = list(Z_vars_obs).index("LON")
-#     lat_obs = np.nanmax(Z_obs[site,:,lat_ind])
-#     long_obs = np.nanmax(Z_obs[site,:,long_ind])
-#     long_obs,lat_obs = utils.coords2index(long_obs, lat_obs)
-    
-#     # direct hits
-#     hit = np.where((lat_sim == lat_obs) & (long_sim == long_obs))[0]
-
-#     # open up to consider nearby grid cells.
-#     if len(hit) == 0:  
-#         done = False
-#         radius = 0
-#         while done == False:
-#             radius += 0.5
-#             hit = np.where((lat_sim >= lat_obs-radius) & 
-#                            (lat_sim <= lat_obs+radius) &
-#                            (long_sim >= long_obs-radius) &
-#                            (long_sim <= long_obs+radius))[0]
-#             if len(hit) > 0:
-#                 done = True
-#                 # for h in hit:
-#                 #     coords = Z_sim[h,0,:].numpy()
-#                 #     print(coords[1], coords[0])
-#         # randomize hits
-#         random.shuffle(hit)
-#     #
-#     hits.append(hit[0])  # in cases with multiple hits just taking the first (random) one
-
-#     # add TEM estimate to X
-#     sim_data = Y_sim[hit[0], :]
-#     new_TEM.append(np.array(sim_data))
-
-#     # 
-#     new_data = np.concatenate([X_obs[site],sim_data], axis=1)    
-
-#     # # don't add flux (avoid doing this, leave for train.ipynb)    
-#     # new_data = np.array(X_obs[site])
-    
-#     new_X.append(new_data)
-#     new_data = np.array(Y_obs[site])        
-#     new_Y.append(new_data)
-#     new_data = np.array(Z_obs[site])        
-#     new_Z.append(new_data)
-#     locs.append([lat_obs, long_obs])
-
-
-# #
-# print(len(hits), len(set(hits)))  # I guess repeated hits means flux towers fall inside the same grid cell?
-# X_obs = np.array(new_X)
-# Y_obs = np.array(new_Y)
-# Z_obs = np.array(new_Z)
-# TEM_data = np.array(new_TEM)
-# print(X_obs.shape)
-# print(Y_obs.shape)
-# print(Z_obs.shape)
-# print(TEM_data.shape)
-# X_vars_obs = np.append(X_vars_obs, "tem_flux")
-# print(X_vars_obs)
-
-
-
-
-# ### time series plot
-# for site in range(len(X_obs)):
-#     fig, ax = plt.subplots(1, 1,figsize=(30, 5*1))
-#     plt.rcParams.update({'font.size': 22})
-#     # units="(TEM units)"
-#     timearr=np.arange(X_obs.shape[1])    
-#     offset = 0
-
-#     data = deepcopy(Y_obs[site, timearr])
-#     # data,_,_ = utils.Z_norm(data)
-#     ax.plot(timearr-offset, data, "o-", label="observed", color='blue')
-
-#     data = deepcopy(TEM_data[site, timearr, 0])
-#     # data,_,_ = utils.Z_norm(data)
-#     data = (data * Y_stats_sim[0,1].numpy()) + Y_stats_sim[0,0].numpy()
-#     ax.plot(timearr-offset, data, "o-", label="TEM", color='red')
-    
-#     ax.set_xlim((timearr[0]-offset,timearr[-1]-offset))
-#     ax.set_xlabel("time (months)")
-#     # ax.set_ylabel(units)
-#     ax.set_title("site " + str(site) + ": " + str(round(np.nanmax(Z_obs[site,:,1]),3)) + ", " + str(round(np.nanmax(Z_obs[site,:,2]),3)))
-#     ax.grid()
-#     ax.xaxis.set_major_locator(ticker.MultipleLocator(12))
-#     ax.legend()
-#     plt.show()
-
-# #fig.savefig("/Users/chris/TempWorkSpace/ch4_" + site + ".pdf", bbox_inches='tight')
-
-
 
 
 ### z-norm
@@ -694,33 +379,20 @@ Y_stats = np.zeros((1, 2))
 
 for v in range(1):
     var = np.nanvar(Y_obs[:,:,v])
-    print(v, var)
     Y_obs[:,:,v], Y_stats[v,0], Y_stats[v,1] = utils.Z_norm(Y_obs[:,:,v])
-print()
 
 for v in range(len(X_vars_obs)):
     var = np.nanvar(X_obs[:,:,v])
-    print(v, var)
     if var > 0:
         X_obs[:,:,v], X_stats[v,0], X_stats[v,1] = utils.Z_norm(X_obs[:,:,v])
     else:
         print("ZERO VARIANCE COLUMN")
 
-
-
-
 ### replace nan with -9999 (for the GRU)
 X_obs = np.nan_to_num(X_obs, nan=-9999)
 Y_obs = np.nan_to_num(Y_obs, nan=-9999)
 
-
-
-
 ### save the data
-print(X_obs.shape)
-print(Y_obs.shape)
-print(Z_obs.shape)
-
 X_obs=torch.tensor(X_obs)
 Y_obs=torch.tensor(Y_obs)
 Z_obs=torch.tensor(Z_obs)
@@ -732,6 +404,4 @@ torch.save({'X': X_obs,
             'X_vars': X_vars_obs,
             'Y_vars': Y_vars_obs,
             'Z_vars': Z_vars_obs,
-            }, outpath)
-
-print("\ndone.")
+            }, config.fp_prep_fluxnet)

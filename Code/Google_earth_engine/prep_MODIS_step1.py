@@ -12,13 +12,8 @@ import config
 
 rep = int(sys.argv[1])
 
-### file paths
-input_path = config.wd + '/Data/'
-output_path = config.wd + '/Out/'
-modis_path = input_path + "/MODIS_global/"
-output_folder = modis_path + "/Out/Intermediate_step1_preprocessing/"
-if not os.path.isdir(output_folder):
-    os.mkdir(output_folder)
+if not os.path.isdir(config.fp_modis_intermediate):
+    os.mkdir(config.fp_modis_intermediate)
 
 ### params
 start_year, end_year = config.start_year, config.end_year
@@ -78,7 +73,7 @@ bands = ["sur_refl_b01",
 I_obs = []
 for site in range(rep*n, (rep*n)+n):
     print(site)
-    folder = modis_path + "/site_" + str(site) + "/"
+    folder = config.fp_modis_global + "/site_" + str(site) + "/"
     grid_cell = []
     for b in range(len(bands)):
 
@@ -103,7 +98,7 @@ for site in range(rep*n, (rep*n)+n):
     tile_size = 10  # 10x10 tiles
     sums = np.array([0.]*7)  # 7 bands
     num_tiles = 100  # 100 random tiles
-    folder = output_folder + "/site_" + str(site) + "/"
+    folder = config.fp_modis_intermediate + "/site_" + str(site) + "/"
     os.makedirs(folder, exist_ok=True)
     for i in range(num_tiles):  
         x = np.random.randint(0, grid_cell.shape[-1]-tile_size)  # columns

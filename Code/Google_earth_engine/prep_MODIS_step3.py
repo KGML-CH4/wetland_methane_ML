@@ -6,17 +6,12 @@ import config
 
 tile_index = sys.argv[1]
 
-input_folder = config.wd + "/Out/MODIS_tiles_TEM/Intermediate_step1_preprocessing/"
-output_folder = confid.wd + "/Out/MODIS_tiles_TEM/Preprocessed_tiles/"
-os.makedirs(output_folder, exist_ok=True)
-
 ### read mean
-fp = output_folder + "/global_means.npy"
+fp = config.fp_modis_tiles + "/global_means.npy"
 means = np.load(fp)
 
 ### load TEM grid cells                                                              
-TEM_preprocess_path = config.wd + "/Out/prep_TEM.sav"
-data0 = torch.load(TEM_preprocess_path, weights_only=False)
+data0 = torch.load(config.fp_prep_TEM, weights_only=False)
 Z_sim = data0['Z']
 num_sites = len(Z_sim)
 
@@ -24,7 +19,7 @@ num_sites = len(Z_sim)
 ssds = np.array([0.]*7)  # 7 bands
 col = []
 for site in range(num_sites):
-    fp = input_folder + "/site_" + str(site) + "/tile_" + str(tile_index) + ".npy"
+    fp = config.fp_modis_intermediate + "/site_" + str(site) + "/tile_" + str(tile_index) + ".npy"
     tile = np.load(fp)  # (156, 7, 10, 10)
     col.append(tile)
     for band in range(7):
@@ -33,9 +28,9 @@ for site in range(num_sites):
 
 # write
 col = np.array(col)
-fp = output_folder + "/tile_" + str(tile_index) + ".npy"
+fp = config.fp_modis_tiles + "/tile_" + str(tile_index) + ".npy"
 np.save(fp, col)     
 
 ### save ssds
-fp = output_folder + "/ssds_" + str(tile_index) + ".npy"
+fp = config.fp_modis_tiles + "/ssds_" + str(tile_index) + ".npy"
 np.save(fp, ssds)

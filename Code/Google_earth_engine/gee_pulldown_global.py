@@ -19,17 +19,15 @@ ee.Authenticate()
 ee.Initialize(config.gee_cred)
 
 rep=int(sys.argv[1])
-output_folder = config.wd + "/Out/MODIS_global/"
-TEM_preprocess_path = "/Out/prep_TEM.sav"
 
-data0 = torch.load(TEM_preprocess_path, weights_only=False)
+data0 = torch.load(config.fp_prep_TEM, weights_only=False)
 Z_sim = data0['Z']
 Z_vars_sim = data0['Z_vars']
 coords = np.nanmax(Z_sim, axis=1)
 del data0
 gc.collect()
-if not os.path.isdir(output_folder):
-    os.mkdir(output_folder)
+if not os.path.isdir(config.fp_modis_global):
+    os.mkdir(config.fp_modis_global)
 
 # shuffle—consistently across reps using same random seed
 shuffled_indices = np.arange(len(coords))
@@ -62,7 +60,7 @@ for i in range(rep*n, (rep*n)+n):
     if i < len(coords):  # not all i's exist
         site = shuffled_indices[i]
         print("site", site, flush=True)
-        folder = output_folder + "/site_" + str(site)
+        folder = config.fp_modis_global + "/site_" + str(site)
         if not os.path.isdir(folder):
             os.mkdir(folder)
 

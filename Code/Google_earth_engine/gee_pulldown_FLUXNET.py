@@ -9,15 +9,14 @@ import os
 ee.Authenticate()
 ee.Initialize(project=config.gee_cred)
 
-# params                                                                                                                                               
+# params                       
 buffer_radius_m = 2500
 scale_m = 500
-input_fp = config.wd + "/Out/fluxnet_emissions_HH.csv"
-output_folder = config.wd + "/Out/MODIS_fluxnet/"
-if not os.path.isdir(output_folder):
-    os.mkdir(output_folder)
 
-def write_data(bands, input_fp):
+if not os.path.isdir(config.fp_modis_fluxnet):
+    os.mkdir(config.fp_modis_fluxnet)
+
+def write_data(bands, config.fp_modis_fluxnet):
     try:
         url = bands.getDownloadUrl({
             'region': window,
@@ -27,7 +26,7 @@ def write_data(bands, input_fp):
             'dimensions': f"{pixel_dim}x{pixel_dim}",
         })
         response = requests.get(url)
-        with open(input_fp + ".tif", 'wb') as fd:
+        with open(config.fp_modis_fluxnet + ".tif", 'wb') as fd:
             fd.write(response.content)
     except Exception:
         print(traceback.format_exc())
@@ -54,7 +53,7 @@ def datedist(img):
 
 ### read metadata - .csv
 sites = {}
-with open(input_fp) as infile:
+with open(config.fp_fluxnet_raw) as infile:
     header = infile.readline().strip().split(",")
     idind = header.index("SITE_ID") 
     latind = header.index("LAT")
@@ -105,7 +104,7 @@ for site in sites:
                    'QA',
                    ]
     for b in range(len(MODIS_BANDS)):
-        filename = output_folder + str(site) + "_" + MODIS_NAMES[b]
+        filename = config.fp_modis_fluxnet + str(site) + "_" + MODIS_NAMES[b]
         if not os.path.isfile(filename + ".tif"):
             MODIS,dates = get_collection('MODIS/061/MOD09A1', MODIS_BANDS[b], window, start_time, end_time)
             write_data(MODIS, filename)

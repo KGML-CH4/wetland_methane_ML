@@ -13,9 +13,7 @@ from sklearn.metrics import r2_score
 import config
 import utils
 
-### file paths                                                                            
 plot_title = sys.argv[1]
-output_path = config.wd + "/Out/"
 
 ### load params
 days_per_month = config.days_per_month
@@ -143,7 +141,7 @@ for site in range(num_sites):
     new_site = []
     for rep in range(num_reps):
         new_rep = []
-        path_out = output_path + 'results_site_' + str(site) + "_rep_" + str(rep) + '.txt'
+        path_out = config.fp_eval + '/results_site_' + str(site) + "_rep_" + str(rep) + '.txt'
 
         if os.path.exists(path_out) is False:
             pass 

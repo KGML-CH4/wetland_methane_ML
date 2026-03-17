@@ -27,11 +27,6 @@ import random
 import config
 import utils
 
-### file paths
-input_path = config.wd + "/Data/"
-output_path = confif_wd + "/Out/"
-path_save_sim = output_path + '/prep_TEM.sav'
-
 def load_predictor(fpath, header, target_year, ch4=False):
     print("loading predictor", fpath)
     counter = 0
@@ -60,7 +55,7 @@ def load_predictor(fpath, header, target_year, ch4=False):
                 
                 # process ch4 data uniquely
                 if ch4 == True:
-                    data *= -1  # flip sign (TEM emissions are negative -Youmi)
+                    data *= -1  # flip sign (TEM emissions are negative)
                     
                     # check for duplicates (doing this row-wise is intentional; because <31-day months will have nan for 31st day. The missing vals are rare, never whole row.)
                     start = ((month-1)*31)  # range of days covered by current row
@@ -118,8 +113,7 @@ def divide_frin(X, FRIN):
 
 def load_siteclass(header):
     print("loading site classification")
-    fp = input_path + "/wet1x1.tem"
-    data = np.genfromtxt(input_path + "/wet1x1.tem", delimiter=',')
+    data = np.genfromtxt(config.fp_wetland_map, delimiter=',')
     counter = 0
     var = np.full((720, 360, 12*31, 1), np.nan)
     long_ind = header.index("LONG")
@@ -236,13 +230,13 @@ for year in range(config.start_year, config.end_year+1):
     variables = []
 
     # ch4
-    fpath = input_path + "ch4emi.day"
+    fpath = config.fp_ch4
     header = ["LONG", "LAT", "VAR_NAME", "DONTKNOW", "DONTKNOW", "DONTKNOW", "DONTKNOW", "AREA", "YEAR", "MONTH", "SUM", "MAX", "MEAN", "MIN"]
     #         -180.0,  65.0,  CH4EMI ,      3,            3,        55.00,      0,        1294,   1978,    1,      0.0,   0.0,   0.00,   0.0
     var = load_predictor(fpath, header, year, ch4=True)
 
     # frin
-    fpath = input_path + "sg_frin.tem"    
+    fpath = config.fp_sgfrin
     header = ["LONG", "LAT", "VAR_NAME", "DONTKNOW", "YEAR", "SUM", "min", "mean", "max"]
     if year <= 2012:
         FRIN = load_predictor(fpath, header, year)
@@ -255,14 +249,14 @@ for year in range(config.start_year, config.end_year+1):
     # LE (era5)
     var = []
     for month in range(12):
-        fpath = input_path + 'LE_land/era5_land_slhf_monthly_' + str(year) + "_" + str(month+1).zfill(2) + '.nc'
+        fpath = config.fp_le + '/era5_land_slhf_monthly_' + str(year) + "_" + str(month+1).zfill(2) + '.nc'
         var.append(load_LE(fpath))
     var = np.concatenate(var, axis = 2)
     var = np.reshape(var, (720, 360, 372, 1))
     variables.append(var)
     
     # temperature
-    fpath = input_path + "ecmwf_TAIR_1979-2018.tem"
+    fpath = config.fp_tair
     header = ["LONG", "LAT", "VAR_NAME", "DONTKNOW", "YEAR", "MONTH", "SUM", "min", "mean", "max"]
     T = load_predictor(fpath, header, year)
     variables.append(T)
@@ -406,4 +400,4 @@ torch.save({'X': torch.tensor(X),
             'X_vars': X_vars,
             'Y_vars': Y_vars,
             'Z_vars': Z_vars,
-            }, path_save_sim)
+            }, config.fp_prep_TEM)

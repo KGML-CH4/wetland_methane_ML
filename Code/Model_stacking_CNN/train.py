@@ -15,18 +15,17 @@ import config
 import utils
 import nn_architectures
 
-site = int(sys.argv[1])
+hold_out_site = int(sys.argv[1])
 rep = int(sys.argv[2])
 
 ### file paths
-model_version = "/model_stack_cnn/"
-output_path =  config.wd + "/Out/" + model_version
-path_save_obs = config.wd + '/Out/prep_obs.sav'
-path_save_sim = config.wd + '/Out/prep_TEM.sav'
-MODIS_path = input_path + "//MODIS_tiles_TEM/Preprocessed_tiles/"
-pretrain_path = output_path + '/train_' + str(model_version) + '.sav'
-finetune_path = output_path + '/finetune_' + str(model_version) + '.sav'
-
+path_out = config.fp_train + '/result_' + str(hold_out_site) + "_rep_" + str(rep) + '.txt'
+pretrain_path = config.fp_train + '/pretrain_' + str(model_version) + "_" + str(hold_out_site) + "_rep_" + str(rep) + '.sav'
+if hold_out_site == 0:
+    finetune_path = config.fp_train + '/production_rep_' + str(rep) + '.sav'
+else:
+    finetune_path = config.fp_train + '/finetune_' + str(model_version) + "_" + str(hold_out_site) + "_rep_" + str(rep) + '.sav'
+    
 ### params
 start_year, end_year = config.start_year, config.end_year
 num_years=end_year-start_year+1
@@ -48,7 +47,7 @@ maxepoch=config.maxepoch
 ############################
 
 ### load observed data first (b/c want to filter these sites from TEM training)
-data0 = torch.load(path_save_obs, weights_only=False)
+data0 = torch.load(config.fp_prep_fluxnet, weights_only=False)
 X_obs = data0['X']
 Y_obs = data0['Y']
 Z_obs = data0['Z']
@@ -165,7 +164,7 @@ G_obs_windows = list(new_G)
 I_obs_windows = list(new_I)
 
 ### load simulated data
-data0 = torch.load(path_save_sim, weights_only=False)
+data0 = torch.load(config.fp_prep_TEM, weights_only=False)
 X_sim = data0['X']
 Y_sim = torch.tensor(data0['Y'])
 Z_sim = data0['Z']
@@ -340,9 +339,9 @@ scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patienc
 maxepoch=100
 
 def load_tile(epoch):
-    means = np.load(MODIS_path + "/global_means.npy")
-    sds = np.load(MODIS_path + "/global_SDs.npy")
-    tile = np.load(MODIS_path + "/tile_" + str(epoch) + ".npy")  # (12519, 156, 7, 10, 10)
+    means = np.load(config.fp_modis_tiles + "/global_means.npy")
+    sds = np.load(config.fp_modis_tiles + "/global_SDs.npy")
+    tile = np.load(config.fp_modis_tiles + "/tile_" + str(epoch) + ".npy")  # (12519, 156, 7, 10, 10)
     
     # normalize
     means = means.reshape(1, 1, 7, 1, 1)
@@ -461,7 +460,6 @@ for epoch in range(maxepoch):
         if val_loss < loss_val_best:
             loss_val_best=np.array(val_loss)
             best_epoch = epoch
-            #os.remove(pretrain_path)
             torch.save({'epoch': epoch,
                     'model_state_dict': model.state_dict(),
                     'loss': train_loss,
@@ -540,16 +538,18 @@ def utils.split_data_group(data0,shuffled_ind,train_frac=0.7,val_frac=0.3):
     data_val = data_val.to(torch.float32)
 
 ### train/val/test split
-
 # separate single test site
-X_test = X_obs_windows[test_index]
-Y_test = Y_obs_windows[test_index]
-Z_test = Z_obs_windows[test_index]
-M_test = M_obs_windows[test_index]
-I_test = I_obs_windows[test_index]
-if len(X_test) == 0:
-    print("\n\n\n\t test data empty\n\n\n")
-    sys.exit()
+if hold_out_site == 0:
+    pass  # production run; include all data
+else:
+    X_test = X_obs_windows[hold_out_site]
+    Y_test = Y_obs_windows[hold_out_site]
+    Z_test = Z_obs_windows[hold_out_site]
+    M_test = M_obs_windows[hold_out_site]
+    I_test = I_obs_windows[hold_out_site]
+    if len(X_test) == 0:
+        print("\n\n\n\t test data empty\n\n\n")
+        sys.exit()
 
 # shuffle remaining
 X_temp = deepcopy(X_obs_windows)
@@ -557,11 +557,15 @@ Y_temp = deepcopy(Y_obs_windows)
 Z_temp = deepcopy(Z_obs_windows)
 M_temp = deepcopy(M_obs_windows)
 I_temp = deepcopy(I_obs_windows)
-del X_temp[test_index]
-del Y_temp[test_index]
-del Z_temp[test_index]
-del M_temp[test_index]
-del I_temp[test_index]
+if hold_out_site == 0:
+    pass  # production run; include all data                                                                                    
+else:
+    del X_temp[hold_out_site]
+    del Y_temp[hold_out_site]
+    del Z_temp[hold_out_site]
+    del M_temp[hold_out_site]
+    del I_temp[hold_out_site]
+#
 shuffled_ind = torch.randperm(len(X_temp))
 
 # X
@@ -697,49 +701,51 @@ print("final train_loss:",train_loss,"val_loss:",val_loss,"val loss best:",loss_
 
 
 ### test
-test_n = X_test.size(0)
-def check_results(total_b, I_test, check_xset, check_y1set, Y_stats):
-    Y_true_all=torch.zeros((check_y1set.shape[0], timesteps_per_year, check_y1set.shape[2]))
-    Y_pred_all=torch.zeros((check_y1set.shape[0], timesteps_per_year, check_y1set.shape[2]))    
-    for bb in range(int(total_b/1)):
-        if bb != int(total_b/1)-1:
-            sbb = bb*1
-            ebb = (bb+1)*1
-        else:
-            sbb = bb*1
-            ebb = total_b
-        hidden = model.init_hidden(ebb-sbb)
-        X_input = check_xset[sbb:ebb, :, :].to(device)
-        Y_true = check_y1set[sbb:ebb, :, :].to(device)
-        I_input = I_test[sbb:ebb, :, :].to(device)
-        Y1_pred_t, hidden = model(I_input, X_input,hidden)
+if hold_out_site == 0:
+    pass  # production run; include all data                                                                                   
+else:
+    test_n = X_test.size(0)
+    def check_results(total_b, I_test, check_xset, check_y1set, Y_stats):
+        Y_true_all=torch.zeros((check_y1set.shape[0], timesteps_per_year, check_y1set.shape[2]))
+        Y_pred_all=torch.zeros((check_y1set.shape[0], timesteps_per_year, check_y1set.shape[2]))    
+        for bb in range(int(total_b/1)):
+            if bb != int(total_b/1)-1:
+                sbb = bb*1
+                ebb = (bb+1)*1
+            else:
+                sbb = bb*1
+                ebb = total_b
+            hidden = model.init_hidden(ebb-sbb)
+            X_input = check_xset[sbb:ebb, :, :].to(device)
+            Y_true = check_y1set[sbb:ebb, :, :].to(device)
+            I_input = I_test[sbb:ebb, :, :].to(device)
+            Y1_pred_t, hidden = model(I_input, X_input,hidden)
 
-        Y_true = Y_true[:,timesteps_per_year:(timesteps_per_year*2),:]  # chop off first year
-        Y1_pred_t = Y1_pred_t[:,timesteps_per_year:(timesteps_per_year*2),:] 
-        
-        #            
-        Y_true_all[sbb:ebb, :, :] = Y_true.to('cpu')  
-        Y_pred_all[sbb:ebb, :, :] = Y1_pred_t.to('cpu')  
-    #
-    loss = []    
-    for varn in range(check_y1set.size(2)):
-        loss.append(mse_missing(Y_pred_all[:,:,varn], Y_true_all[:,:,varn]).numpy())
-    return Y_pred_all, loss
+            Y_true = Y_true[:,timesteps_per_year:(timesteps_per_year*2),:]  # chop off first year
+            Y1_pred_t = Y1_pred_t[:,timesteps_per_year:(timesteps_per_year*2),:] 
+
+            #            
+            Y_true_all[sbb:ebb, :, :] = Y_true.to('cpu')  
+            Y_pred_all[sbb:ebb, :, :] = Y1_pred_t.to('cpu')  
+        #
+        loss = []    
+        for varn in range(check_y1set.size(2)):
+            loss.append(mse_missing(Y_pred_all[:,:,varn], Y_true_all[:,:,varn]).numpy())
+        return Y_pred_all, loss
 
 
-with torch.no_grad():
-    checkpoint=torch.load(finetune_path, map_location=torch.device('cpu'), weights_only=False)
-    model=model_stack_wCNN(X_obs_windows[0].shape[-1],n_a,n_l,1,dropout)
-    model.load_state_dict(checkpoint['model_state_dict'])
-    model.to(device) #too large for GPU, kif not enough, change to cpu
-    model.eval()  # this is "testing" model, it switches off dropout and batch norm.
-    epoch = checkpoint['epoch']
-    Y_test_pred,R_test,loss_test =  check_results(test_n, I_test.float(), X_test.float(), Y_test, Y_stats)    
+    with torch.no_grad():
+        checkpoint=torch.load(finetune_path, map_location=torch.device('cpu'), weights_only=False)
+        model=model_stack_wCNN(X_obs_windows[0].shape[-1],n_a,n_l,1,dropout)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        model.to(device) #too large for GPU, kif not enough, change to cpu
+        model.eval()  # this is "testing" model, it switches off dropout and batch norm.
+        epoch = checkpoint['epoch']
+        Y_test_pred,R_test,loss_test =  check_results(test_n, I_test.float(), X_test.float(), Y_test, Y_stats)    
 
-    # write
-    path_out = output_path + '/result_' + str(test_index) + "_rep_" + str(rep) + '.txt'
-    with open(path_out, "w") as outfile:
-        for window in range(Y_test_pred.shape[0]):
-            outline = list(Y_test_pred[window,:,0].numpy())
-            outline = "\t".join(list(map(str, outline)))
-            outfile.write(outline + "\n")
+        # write
+        with open(path_out, "w") as outfile:
+            for window in range(Y_test_pred.shape[0]):
+                outline = list(Y_test_pred[window,:,0].numpy())
+                outline = "\t".join(list(map(str, outline)))
+                outfile.write(outline + "\n")

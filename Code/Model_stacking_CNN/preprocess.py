@@ -26,13 +26,6 @@ import matplotlib.ticker as ticker
 import config
 import utils
 
-### file paths
-model_version = "modelStackCNN"
-input_path = config.wd + "/Data/"
-output_path = config.wd + "/Out/" + model_version + "/"
-path_save_obs = config.wd + "/Out/prep_model.sav"
-modis_path = input_path + "/MODIS_fluxnet/"
-
 ### load params
 start_year, end_year = config.start_year, config.end_year
 year_range = end_year-start_year+1
@@ -43,7 +36,7 @@ days_per_month = config.days_per_month
 ### read fluxnet data
 X_obs = []
 counter = 0
-with open(input_path + "/fluxnet_emissions_HH.csv") as infile:
+with open(config.fp_fluxnet_raw) as infile:
     X_vars_obs = np.array(infile.readline().strip().split(","))
     for line in infile:
         counter += 1
@@ -107,7 +100,7 @@ obs = obs * (100. / 72.2)
 X_obs[:,ind] = deepcopy(obs)
 
 ### swap out site class for new classes                                                                                                 
-wettypes = np.genfromtxt(input_path + '/wetland_classification.txt',dtype='str')
+wettypes = np.genfromtxt(config.fp_wetland_class,dtype='str')
 siteid_ind = list(X_vars_obs).index("SITE_ID")
 class_ind = list(X_vars_obs).index("SITE_CLASSIFICATION")
 for row in range(X_obs.shape[0]):
@@ -279,12 +272,12 @@ for b in range(len(bands)):
 
         # read data
         fp = site_ID + "_" + bands[b]
-        with rasterio.open(modis_path +fp + ".tif") as src:
+        with rasterio.open(config.fp_modis_fluxnet +fp + ".tif") as src:
             data = src.read()
     
         # read QC
         fp = site_ID + "_" + QC_band
-        with rasterio.open(modis_path + fp + ".tif") as src:
+        with rasterio.open(config.fp_modis_fluxnet + fp + ".tif") as src:
             qc = src.read()
         v_modland_bits = np.vectorize(modland_bits)
         qc = v_modland_bits(qc)
@@ -294,7 +287,7 @@ for b in range(len(bands)):
         data = np.where(qc, data, np.nan)
         
         # fill gaps
-        timestamps = np.load(modis_path + fp + ".npy")
+        timestamps = np.load(config.fp_modis_fluxnet + fp + ".npy")
         data = fill_gaps(data, timestamps).astype(float)  # one site, of one band
         
         #
@@ -450,4 +443,4 @@ torch.save({'X': X_obs,
             'X_vars': X_vars_obs,
             'Y_vars': Y_vars_obs,
             'Z_vars': Z_vars_obs,
-            }, path_save_obs)
+            }, config.fp_prep_model)
