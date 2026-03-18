@@ -377,3 +377,24 @@ process Upscale_WAD2M {
     echo "Done." > upscale_wad2m_${rep}.txt
     """
 }
+
+
+
+process Global_plot_WAD2m {
+    // resources
+    memory '200 GB'
+    time '2h'
+
+    // misc. settings
+    publishDir "${params.workdir}/Out/Upscale_WAD2M/", mode: 'copy'
+    tag "plot_upscale_wad2m"
+    conda "${params.repo}/requirements.yml"
+
+    output:
+    path "hybrid.pdf"
+
+    script:
+    """
+    python ${params.repo}/Code/Model_stacking_CNN/plot.py
+    """
+}
