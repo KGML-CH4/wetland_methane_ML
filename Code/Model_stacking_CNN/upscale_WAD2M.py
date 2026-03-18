@@ -1,9 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[75]:
-
-
 import numpy as np
 import matplotlib.pyplot as plt
 import math
@@ -21,140 +15,11 @@ import gc
 import rasterio
 import netCDF4 as nc
 from skimage.measure import block_reduce
+import config
+import utils
 
 
-# In[76]:
-
-
-def Z_norm(X):
-    X_mean=np.nanmean(X)
-    X_std=np.nanstd(np.array(X))
-    return (X-X_mean)/X_std, X_mean, X_std
-    
-def Z_norm_reverse(X,Xnorm,units_convert=1.0):
-    return (X*Xnorm[1]+Xnorm[0])*units_convert
-
-def coords2index(long, lat):
-    # long coords range (-180, 180); lat coords range (-90,90) verified bashing the data files
-    long_ind = long + 180  # (0,360)
-    lat_ind = lat + 90  # (0,180)
-
-    # both lat and long have 1/2 degree increments = 720 indices for each.    
-    long_ind *= 2  # (0,720)
-    lat_ind *= 2  # (0,360)
-
-    # integer indices
-    long_ind = int(long_ind)
-    lat_ind = int(lat_ind)
-
-    return long_ind, lat_ind
-
-
-# In[77]:
-
-
-### nn architecture
-
-num_classes = 3
-
-class cnn_branch(nn.Module):
-    def __init__(self):
-        super(cnn_branch, self).__init__()
-        self.num_classes=num_classes
-        self.conv1 = nn.Conv2d(in_channels=7, out_channels=16, kernel_size=(3,3))
-        self.conv2 = nn.Conv2d(in_channels=16, out_channels=32, kernel_size=(3,3))
-        self.dense_1 = nn.Linear(128, 64)
-        self.dense_2 = nn.Linear(64, self.num_classes)
-        # self.dense_1 = nn.Linear(128, 1)
-        # self.dense_2 = nn.Linear(timesteps_per_year*2, self.num_classes)
-        self.pool = nn.MaxPool2d((2,2))
-        
-    def forward(self, images):
-        B, T, C, H, W = images.shape  # [10, 24, 7, 10, 10]
-        output = images.view(B * T, C, H, W)  # [240, 7, 10, 10]
-        output = self.conv1(output)  # [240, 8, 8, 8]
-        output = F.relu(output) 
-        output = self.pool(output)  # [240, 16, 4, 4]
-        output = self.conv2(output)  # [240, 16, 2, 2]
-        output = F.relu(output) 
-
-        # flattens all channels of each image for each training example x timestep
-        output = output.flatten(start_dim=1)  # [240, 64]  
-        output = self.dense_1(output)  # [240, 16]
-        output = F.relu(output)
-        output = self.dense_2(output)  # [240, 16]
-
-        output = F.gumbel_softmax(output, tau=1.0, hard=True, dim=1)  # torch.Size([240, 4])
-        output = output.view(B, T, -1)  # [10, 24, 4]
-        
-        return output
-
-
-class pureML_GRU(nn.Module):
-    def __init__(self, ninp, nhid, nlayers, nout1, dropout):
-        super(pureML_GRU, self).__init__()
-        self.num_classes=num_classes
-        self.gru = nn.GRU(ninp+self.num_classes, nhid, nlayers,dropout=dropout, batch_first=True)
-        self.densor_flux = nn.Linear(nhid, nout1)
-        self.nhid = nhid
-        self.nlayers = nlayers
-        self.drop=nn.Dropout(dropout)
-        self.init_weights()
-        self.cnn_branch = cnn_branch()
-
-    def init_weights(self):
-        initrange = 0.1 #may change to a small value
-        self.densor_flux.bias.data.zero_()
-        self.densor_flux.weight.data.uniform_(-initrange, initrange)
-
-    def forward(self, images, inputs, hidden):
-        output = self.cnn_branch(images)  # torch.Size([10, 24, 4])
-        output = torch.cat([inputs, output], dim=-1)  # torch.Size([10, 24, 6])
-        output, hidden = self.gru(output, hidden) 
-        output = self.drop(output)
-        output = self.densor_flux(output)  # torch.Size([10, 24, 1])
-        return output, hidden
-        
-    def init_hidden(self, bsz):
-        weight = next(self.parameters())
-        return weight.new_zeros(self.nlayers, bsz, self.nhid)
-
-
-# In[78]:
-
-
-### file paths
-model_version = "UPSCALE"
-pretrain_version = "161"
-
-input_path = '/scratch.global/chriscs/KGML/Data/Emissions/'
-output_path = '/scratch.global/chriscs/KGML/Out/Emissions/v' + model_version + "/"
-stats_path = '/scratch.global/chriscs/KGML/Out/Emissions/v' + pretrain_version + "/fluxnet_obs_v" + pretrain_version + '.sav'
-final_model_path = "/scratch.global/chriscs/KGML/Out/Emissions/v" + pretrain_version + "/"
-modis_path = '/scratch.global/chriscs/KGML/Data/Emissions/MODIS_full_upscale/'
-
-
-# input_path = '/Users/chris/TempWorkSpace/KGML/Data/Emissions/'
-# output_path = '/Users/chris/TempWorkSpace/KGML/Out/Emissions/v' + model_version + "/"
-
-path_save_obs = output_path + 'fluxnet_obs_v' + model_version + '.sav'
-path_save_sim = output_path + 'fluxnet_sim_v' + model_version + '.sav'
-pretrain_path = output_path + 'train_' + str(model_version) + '.sav'
-finetune_path = output_path + 'finetune_' + str(model_version) + '.sav'
-#path_shuffle = output_path + 'shuffle_inds_v' + model_version + '.sav'
-
-
-# WAD2M
-gridded_preprocess_path = '/scratch.global/chriscs/KGML/Out/Emissions/vUPSCALE/fluxnet_sim_vWAD2M.sav'
-ml_output_path = output_path + "/WAD2M/"
-
-# # SGFRIN
-# gridded_preprocess_path = '/scratch.global/chriscs/KGML/Out/Emissions/vUPSCALE/fluxnet_sim_vSGFRIN.sav'
-# ml_output_path = output_path + "/SGFRIN/"
-
-
-# In[79]:
-
+rep = int(sys.argv[1])
 
 ### params
 start_year, end_year = 2006, 2018  # these are the years of fluxnet data
@@ -165,85 +30,31 @@ num_windows=int(np.floor((timesteps-24)/12+1))   # ***DON'T TOUCH—model does n
 days_per_month = [31,28,31,30,31,30,31,31,30,31,30,31]
 nonmissing_required = 4
 shift_size = 6  # six month shift for southern hemisphere
-print(num_windows)
-
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
-
-
-
-# In[86]:
-
 
 ### load global (+TEM) data
-data0 = torch.load(gridded_preprocess_path, weights_only=False)
-# fp = "/scratch.global/chriscs/KGML/Out/Emissions/vUPSCALE/fluxnet_sim_vUPSCALE.sav_OG"
-# data0 = torch.load(fp, weights_only=False)
+data0 = torch.load(config.fp_upscale_prep, weights_only=False)
 X_sim = data0['X']
 Y_sim = data0['Y']
 Z_sim = data0['Z']
-print(X_sim.shape, flush=True)
-print(Y_sim.shape, flush=True)
-print(Z_sim.shape, flush=True)
 X_vars_sim = data0['X_vars']
 Z_vars_sim = data0['Z_vars']
-print(X_vars_sim, flush=True)
-print(Z_vars_sim, flush=True)
 X_stats_sim = data0['X_stats']
 Y_stats_sim = data0['Y_stats']
 Z_coords = np.nanmax(Z_sim, axis=1)
 longlat = np.nanmax(Z_sim, axis=1)
-print(Z_coords)
 num_sites = len(X_sim)
-print(num_sites)
-
 del data0
 del Z_sim
 gc.collect()
-
-
-# In[87]:
-
-
-a = (X_sim == -9999)
-a = torch.sum(a, axis=(0,2))
-plt.plot(a)
-plt.show()
-
-
-# In[81]:
-
 
 ### swap -9999 for nan
 X_sim[X_sim == -9999] = np.nan
 Y_sim[Y_sim == -9999] = np.nan
 
-
-# In[60]:
-
-
 ### undo original TEM normalization
-Y_sim[:,:,0] = Z_norm_reverse(Y_sim[:,:,0], Y_stats_sim[0,:])
+Y_sim[:,:,0] = utils.Z_norm_reverse(Y_sim[:,:,0], Y_stats_sim[0,:])
 for v in range(len(X_vars_sim)):
-    X_sim[:,:,v] = Z_norm_reverse(X_sim[:,:,v], X_stats_sim[v,:])
-
-
-# In[61]:
-
+    X_sim[:,:,v] = utils.Z_norm_reverse(X_sim[:,:,v], X_stats_sim[v,:])
 
 ### Separate out "area" variable
 
@@ -252,153 +63,32 @@ aind = list(X_vars_sim).index("area")
 area_sim = X_sim[:,:,aind]
 area_sim = np.nanmax(area_sim, axis=1)
 area_vars_sim = X_vars_sim[aind]
-print(area_vars_sim, area_sim.shape)
 
 # remove from X
 X_sim = np.delete(X_sim, aind, axis=2)
 X_vars_sim = np.delete(X_vars_sim, aind)
 
-print(X_vars_sim)
-print(X_vars_sim.shape)
-print(X_sim.shape)
-
-
-# In[62]:
-
-
 ### add on the TEM estimate
-print(X_sim.shape)
-print(Y_sim.shape)
 X_sim = torch.concatenate([X_sim, Y_sim], dim=-1)
-print(X_sim.shape)
-
-
-# In[63]:
-
 
 ### normalize using observed mean and sd
-data0 = torch.load(stats_path, weights_only=False)
+data0 = torch.load(config.fp_prep_fluxnet, weights_only=False)
 X_stats_obs = data0['X_stats']
 X_vars = data0['X_vars']
 Y_stats_obs = data0['Y_stats']
 I_stats_obs = data0['I_stats']
-print(X_stats_obs.shape)
-
-#  sim vars
-# ['LE' 'temp' 'site_class_1' 'site_class_2' 'site_class_3' 'site_class_4']
-#    0     1       2            3                 4                5
-#
-#  obs vars
-#  ['FCH4' 'LE_F' 'TA_F' 'FCH4_F_ANNOPTLM' 'site_class_1' 'site_class_2' 'site_class_3' 'site_class_4' 'tem_flux']
-#     0      1       2          3                 4             5              6             7             8
-
 
 # re-order
 inds = [1, 2, 4, 5, 6, 7] 
 X_stats_obs = X_stats_obs[inds,:]
-print(X_stats_obs.shape)
 
 for v in range(len(X_stats_obs)): 
     X_sim[:,:,v] = (X_sim[:,:,v] - X_stats_obs[v,0]) / X_stats_obs[v,1]
 
-print(X_sim.shape)
-
-
-# In[64]:
-
-
 ### convert nans back to -9999
-
-print(torch.sum(X_sim==-9999))
-print(torch.sum(np.isnan(X_sim)))
 X_sim = torch.nan_to_num(X_sim, nan=-9999)
-print(torch.sum(X_sim==-9999))
-print(torch.sum(np.isnan(X_sim)))
-
-
-# In[65]:
-
-
-# ### sg_FRIN
-# def load_predictor(fpath, header, target_year, ch4=False):
-#     print("loading predictor", fpath)
-#     counter = 0
-#     var = np.full((720, 360, 12), np.nan)
-#     long_ind = header.index("LONG")  # index for "LONG" in the list of variables
-#     lat_ind = header.index("LAT")
-#     year_ind = header.index("YEAR")
-#     with open(fpath) as infile:
-#         for line in infile:
-#             counter += 1
-#             newline = line.strip().split(",")
-#             year = int(newline[year_ind])                  
-#             if year == target_year:
-#                 long = float(newline[long_ind])  # the longitude coordinate of the grid cell
-#                 lat = float(newline[lat_ind])
-#                 long_cell, lat_cell = coords2index(long, lat)  # convert the lat long to array indices starting from 0 (instead of negatives)
-#                 data = newline[len(header):len(newline)-1]  
-#                 data = np.array(data).astype(np.float32)
-#                 data[data == -99999.0] = 0
-#                 data /= 10000
-#                 var[long_cell, lat_cell, :] = data
-#     #
-#     return var
-
-
-
-
-# fpath = input_path + "sg_frin.tem"    
-# header = ["LONG", "LAT", "VAR_NAME", "DONTKNOW", "YEAR", "SUM", "min", "mean", "max"]
-# year_range = end_year-start_year+1
-# newFRIN = []
-# for year in range(2006, 2018+1):
-#     print(year)
-#     if year <= 2012:
-#         newFRIN.append(load_predictor(fpath, header, year))
-#     else:  # use 2012 data for later years
-#         newFRIN.append(load_predictor(fpath, header, 2012))
-# #
-# newFRIN = np.concatenate(newFRIN, axis=-1)
-# print(np.nanmean(newFRIN))
-# print(newFRIN.shape)
-
-
-# # # plot for sanity check
-# # import cartopy.crs as ccrs
-# # import cartopy.feature as cfeature
-# # import matplotlib.colors as colors
-# # from matplotlib.colors import SymLogNorm
-# # data = newFRIN
-# # data = np.squeeze(data)
-# # data[data ==-9999] = np.nan
-# # data = np.nanmean(data, axis=-1)   # ************ correct index?***************
-# # plt.hist(data.flatten(), bins=100)
-# # plt.show()
-# # data = data.T
-# # lon = np.linspace(-180, 180, 720)
-# # lat = np.linspace(-90, 90, 360)
-# # fig = plt.figure(figsize=(11, 6))
-# # ax = plt.axes(projection=ccrs.PlateCarree())    
-# # heatmap = ax.pcolormesh(lon, lat, data, transform=ccrs.PlateCarree(),
-# #                         cmap='coolwarm')
-# # ax.coastlines()  # Outline of continents
-# # ax.add_feature(cfeature.LAND, facecolor='lightgray', edgecolor='black', alpha=0.3)
-# # ax.add_feature(cfeature.OCEAN, facecolor='white', alpha=0.2)
-# # ax.gridlines(draw_labels=True, linewidth=0.5, color='gray', alpha=0.5)
-# # cbar = fig.colorbar(heatmap, ax=ax, orientation='horizontal',
-# #                     pad=0.05,  # distance from plot
-# #                     fraction=0.035,  # relative width of colorbar
-# #                     shrink=0.7,  # shrink height (for horizontal, this affects thickness)
-# #                     aspect=25)  # ratio of long to short axis
-# # plt.tight_layout()
-# # plt.show()
-
-
-# In[66]:
-
 
 ### load new FRIN
-
 def get_area(resolution):  # (google)
     R = 6_371_000  # average radius of Earth (meters) https://en.wikipedia.org/wiki/Earth_radius
     dlat = float(resolution)  # degrees lat/lon
@@ -443,78 +133,29 @@ def load_newFRIN(fp, target_year):
     for month in range(12):
         datum = frin[month, :, :]
         datum = np.swapaxes(datum, 0, 1)  # (720, 360)
-        # datum = np.expand_dims(datum, axis=-1)  # (720, 360, 1)
-        # datum = np.repeat(datum, 31, axis=-1)  # (720, 360, 31)
-        # start_day = month*31
-        # end_day = start_day + 31
-        # data[:,:,start_day:end_day] = datum
         data[:,:,month] = datum
 
     # convert nan to zero
-    #     (why?)
-    data = np.nan_to_num(data, nan=0)  # I think this is currently missing in the sgfrin version
-    
-    
-    #    
+    data = np.nan_to_num(data, nan=0)
+
     return data
 
 frin_file = output_path + "/frin_processed.npy"
 if os.path.exists(frin_file):    
     newFRIN = np.load(frin_file)
 else:
-    #fp = input_path + "WAD2M_wetlands_2000-2020_05deg_Ver2.0.nc"    
-    fp = input_path + "WAD2M_wetlands_2000-2020_025deg_Ver2.0.nc"    
     year_range = end_year-start_year+1
     newFRIN = []
     for year in range(2006,2018+1):
-        print(year)
-        newFRIN.append(load_newFRIN(fp, year))
+        newFRIN.append(load_newFRIN(config.fp_WAD2M_map, year))
     #
     newFRIN = np.concatenate(newFRIN, axis=-1)
     np.save(frin_file, newFRIN)
-print(newFRIN.shape)  # (720, 360, 156)
-print(np.nanmean(newFRIN))
 
 ### offset southern hemisphere by 6 months
 shifted = newFRIN[:, 0:180, shift_size:].copy()  # new var of shifted data
 newFRIN[:, 0:180, :] = np.nan  # replace old data with nans
 newFRIN[:, 0:180, 0:-shift_size] = shifted.copy()  # shove in shifted data
-print(newFRIN.shape)  # (720, 360, 156)
-print(np.nanmean(newFRIN))
-
-# # plot for sanity check
-# import cartopy.crs as ccrs
-# import cartopy.feature as cfeature
-# import matplotlib.colors as colors
-# from matplotlib.colors import SymLogNorm
-# data = newFRIN
-# data = np.squeeze(data)
-# data[data ==-9999] = np.nan
-# data = np.nanmean(data, axis=-1)  # ********************** CORRECT INDEX???????????*****************
-# plt.hist(data.flatten(), bins=100)
-# plt.show()
-# data = data.T
-# lon = np.linspace(-180, 180, 720)
-# lat = np.linspace(-90, 90, 360)
-# fig = plt.figure(figsize=(11, 6))
-# ax = plt.axes(projection=ccrs.PlateCarree())    
-# heatmap = ax.pcolormesh(lon, lat, data, transform=ccrs.PlateCarree(),
-#                         cmap='coolwarm')
-# ax.coastlines()  # Outline of continents
-# ax.add_feature(cfeature.LAND, facecolor='lightgray', edgecolor='black', alpha=0.3)
-# ax.add_feature(cfeature.OCEAN, facecolor='white', alpha=0.2)
-# ax.gridlines(draw_labels=True, linewidth=0.5, color='gray', alpha=0.5)
-# cbar = fig.colorbar(heatmap, ax=ax, orientation='horizontal',
-#                     pad=0.05,  # distance from plot
-#                     fraction=0.035,  # relative width of colorbar
-#                     shrink=0.7,  # shrink height (for horizontal, this affects thickness)
-#                     aspect=25)  # ratio of long to short axis
-# plt.tight_layout()
-# plt.show()
-
-
-# In[67]:
-
 
 def yearly(timeseries):
     days_per_month = [31,28,31,30,31,30,31,31,30,31,30,31]
@@ -524,14 +165,8 @@ def yearly(timeseries):
             tot += timeseries[month] * days_per_month[month]
     return tot
 
-
-# In[68]:
-
-
-### separate function to retain monthly estimates (Youmi asked for this)
-
 @torch.no_grad()
-def youmi_upscale(sitedata, area, frin, I_obs, lat):
+def upscale(sitedata, area, frin, I_obs, lat):
     windowed_estimates = []
     windowed_frins = []
     for it in range(num_windows):
@@ -575,11 +210,7 @@ def youmi_upscale(sitedata, area, frin, I_obs, lat):
         if analyze == True:
             hidden = model.init_hidden(1)  # bsz=1
             X_input = torch.unsqueeze(x_piece, dim=0).to(torch.float32)
-            # print(x_piece.shape)
-            # print(i_piece.shape)
             I_input = torch.unsqueeze(i_piece, dim=0).to(torch.float32)
-            # print(i_piece.shape)
-            # print(I_input.shape, X_input.shape, hidden.shape)
             pred, _ = model(I_input, X_input, hidden)
             pred = pred[0,timesteps_per_year:(timesteps_per_year*2),0]  # chop off first year
             f_piece = f_piece[timesteps_per_year:(timesteps_per_year*2)]
@@ -616,10 +247,6 @@ def youmi_upscale(sitedata, area, frin, I_obs, lat):
 
     return(windowed_estimates)
 
-
-# In[69]:
-
-
 ### model params
 n_a=8 #hidden state number
 n_l=2 #layer of gru
@@ -635,10 +262,6 @@ bands =        ['sur_refl_b01',
                'sur_refl_b06',
                'sur_refl_b07',
                ]
-
-
-# In[70]:
-
 
 ### match coords used to pull down MODIS images to the new coords
 TEM_preprocess_path = "/scratch.global/chriscs/KGML/Out/Emissions/vUPSCALE/fluxnet_sim_vSGFRIN.sav"
@@ -658,32 +281,20 @@ for i, coord in enumerate(Z_coords.tolist()):
 
 print(len(match_map))
 
-
-# In[71]:
-
-
 ### subset the sites for parallel computing
-shuffled_indices = np.arange(num_sites)  # shuffle—consistently across reps using same random seed                                                                                                                                                 
+shuffled_indices = np.arange(num_sites)  # shuffle—consistently across reps using same random seed
 rng = np.random.default_rng(seed=123)
 rng.shuffle(shuffled_indices)
 
-# subset table for current rep                                                                                                                                                                            
+# subset table for current rep                                                              
 max_concurrent_requests = 1000
 n = int(np.ceil(num_sites / max_concurrent_requests))   # 50788/1000=50.788
-print(n)
-
-
-# In[72]:
-
 
 ### the loop: predict on each grid cell  
-
-#for i in range(run*n, (run*n)+n):  # production version
-for i in range(2):  # testing version
+for i in range(run*n, (run*n)+n):
     if i < num_sites:  # not all i's exist using range(it*n, (it*n)+n)                                                                                                                                                              
         site = shuffled_indices[i]
-        # site_output_fp = ml_output_path + "/production_estimates_site_" + str(site) + ".npy"
-        site_output_fp = ml_output_path + "/youmi_estimates_site_" + str(site) + ".npy"
+        site_output_fp = config.fp_upscale_out + "/estimates_site_" + str(site) + ".npy"
         if os.path.exists(site_output_fp):    
             print(site_output_fp, "exists")
         else:
@@ -691,8 +302,8 @@ for i in range(2):  # testing version
             long_ind,lat_ind = coords2index(long, lat) 
             
             # load MODIS image
-            if site in match_map:   # ************************************ skips some sites ************************          
-                folder = modis_path + "/site_" + str(match_map[site]) + "/"
+            if site in match_map:
+                folder = config.fp_modis_global + "/site_" + str(match_map[site]) + "/"
                 I = []
                 for band in range(len(bands)):
                     filename = folder + "/" + bands[band] + ".tif"
@@ -715,22 +326,20 @@ for i in range(2):  # testing version
                     I[:] = np.nan  # replace old data with nans
                     I[0:-shift_size, :,:,:] = shifted.clone()  # shove in shifted data                
                                 
-                youmi_estimates = []
-                #for rep in range(100):  # production
-                for rep in range(2):  # testing
+                estimates = []
+                for rep in range(100):
                     print("rep", rep, "site", site)
                 
                     # load up model
-                    fp = final_model_path + "/production_rep_" + str(rep) + ".sav"
+                    fp = config.config.fp_train + "/production_rep_" + str(rep) + ".sav"
                     checkpoint=torch.load(fp, map_location=torch.device('cpu'), weights_only=False)
-                    model=pureML_GRU(7,n_a,n_l,1,dropout)
+                    model=model_stack_wCNN(7,n_a,n_l,1,dropout)
                     model.load_state_dict(checkpoint['model_state_dict'])
                     model.to(device)
                     model.eval()    
                         
                     # tile across the big image
                     tiles = []
-                    youmi_tiles = []
                     tile_size = 10  # model expects 10x10 images
                     nrows = int(np.floor(I.shape[-2]/tile_size))  
                     ncols = int(np.floor(I.shape[-1]/tile_size))
@@ -739,139 +348,19 @@ for i in range(2):  # testing version
                             y = row*tile_size
                             x = col*tile_size
                             tile = I[:,:,y:y+tile_size,x:x+tile_size]  # torch.Size([156, 7, 10, 10])
-                            youmi_tile = youmi_upscale(X_sim[site], 
+                            tile = upscale(X_sim[site], 
                                                        area_sim[site], 
                                                        newFRIN[long_ind,lat_ind,:], 
                                                        tile, 
                                                        lat)  # torch.Size([12, 12])
-                            youmi_tiles.append(youmi_tile)
+                            tiles.append(tile)
                 
                     # average across tiles (we're still inside a single rep)
-                    youmi_tiles = np.stack(youmi_tiles, axis=-1)  # (12, 12, 121)
-                    youmi_tiles = np.nanmean(youmi_tiles, axis=-1)  # (12, 12)
-                    youmi_estimates.append(youmi_tiles)
+                    tiles = np.stack(tiles, axis=-1)  # (12, 12, 121)
+                    tiles = np.nanmean(tiles, axis=-1)  # (12, 12)
+                    estimates.append(tiles)
                 
                 # save
-                youmi_estimates = np.stack(youmi_estimates, axis=-1)  # (12, 12, 100)
-                print(youmi_estimates.shape)
-                # np.save(site_output_fp, estimates)
-                # site_output_fp = ml_output_path + "/youmi_estimates_site_" + str(site)
-                np.save(site_output_fp, youmi_estimates)
-
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
-
-
-
-# In[112]:
-
-
-### plot outputs from forward pass with different temperatures
-
-i=0
-site = shuffled_indices[i]
-site_output_fp = ml_output_path + "/youmi_estimates_site_" + str(site) + ".npy"
-long,lat = longlat[site]
-long_ind,lat_ind = coords2index(long, lat) 
-print(lat, long)
-
-temper_idx = 1  # ['LE' 'temp' 'site_class_1' 'site_class_2' 'site_class_3' 'site_class_4']
-X_input = X_sim[site].clone()  # isolate site  torch.Size([156, 7])
-X_input[X_input==-9999] = np.nan  # convert to nan
-mean = np.nanmean(X_input[:,temper_idx])
-X_input[:,temper_idx] -= mean  # center temperature data at 0.0
-X_input = np.nan_to_num(X_input, nan=-9999)  # replace nans again
-X_input = torch.tensor(X_input)
-
-# load MODIS image
-folder = modis_path + "/site_" + str(match_map[site]) + "/"
-I = []
-for band in range(len(bands)):
-    filename = folder + "/" + bands[band] + ".tif"
-    with rasterio.open(filename) as src:
-        data = src.read()
-        I.append(data)
-#
-I = np.stack(I, axis=1)  # torch.Size([156, 7, 112, 112])
-
-# normalize
-I[I==-9999] = np.nan
-for v in range(I.shape[1]):
-    I[:,v,:,:] = (I[:,v,:,:] - I_stats_obs[v,0]) / I_stats_obs[v,1]
-I = np.nan_to_num(I, nan=-9999)
-I = torch.tensor(I)
-
-# shift MODIS data 6 months
-if lat < 0:
-    shifted = I[shift_size:, :,:,:].clone()  # new var of shifted data
-    I[:] = np.nan  # replace old data with nans
-    I[0:-shift_size, :,:,:] = shifted.clone()  # shove in shifted data                
-                
-rep=0
-
-# load up model
-fp = final_model_path + "/production_rep_" + str(rep) + ".sav"
-checkpoint=torch.load(fp, map_location=torch.device('cpu'), weights_only=False)
-model=pureML_GRU(7,n_a,n_l,1,dropout)
-model.load_state_dict(checkpoint['model_state_dict'])
-model.to(device)
-model.eval()    
-    
-# tile across the big image
-tiles = []
-youmi_tiles = []
-tile_size = 10  # model expects 10x10 images
-nrows = int(np.floor(I.shape[-2]/tile_size))  
-ncols = int(np.floor(I.shape[-1]/tile_size))
-row,col=0,0
-# for row in range(nrows):
-#     for col in range(ncols):
-y = row*tile_size
-x = col*tile_size
-tile = I[:,:,y:y+tile_size,x:x+tile_size]  # torch.Size([156, 7, 10, 10])
-
-# pred
-preds = []
-for i in range(50):
-    X_input[:,temper_idx] += 1  # add 1 degree C
-    output = youmi_upscale(X_input, 
-                               area_sim[site], 
-                               newFRIN[long_ind,lat_ind,:], 
-                               tile, 
-                               lat)  # torch.Size([12, 12])
-    #
-    # output = output.flatten()
-    # plt.plot(output)
-    # plt.show()
-    preds.append(output.nanmean(axis=0).nansum())
-
-# plot
-fig = plt.gcf()
-fig.set_size_inches(4, 3)  # width, height in inches
-plt.plot(preds)
-plt.xlabel("Mean temperature (C), artificially adjusted")
-plt.ylabel("Emission (Tg/yr/m^2)")
-plt.title(r"Individual grid cell: -7$^\circ$S 21$^\circ$E")
-plt.savefig(ml_output_path + "/emission_v_temperature.pdf", bbox_inches="tight")
-plt.show()
-
-
-# In[ ]:
-
-
-
+                estimates = np.stack(estimates, axis=-1)  # (12, 12, 100)
+                np.save(site_output_fp, estimates)
 

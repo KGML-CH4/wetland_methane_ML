@@ -52,6 +52,7 @@ fp_prep_model = wd + "/Out/" + model_version + "/prep_model.sav"
 fp_train = wd + '/Out/' + model_version + '/Training/' 
 fp_eval = wd + '/Out/' + model_version + '/Eval/'
 fp_upscale_prep = wd + '/Out/' + model_version + '/Upscale/prep_upscale_WAD2M.sav'
+fp_upscale_out = wd + '/Out/' + model_version + '/Upscale/'
 
 
 
