@@ -13,15 +13,7 @@ from sklearn.metrics import r2_score
 import config
 import utils
 
-
-
-### file paths                                                                            
-wd = sys.argv[1]
-output_path = sys.argv[2]
-plot_title = sys.argv[3]
-sys.stderr.write("using working dir:" + wd + "\n")
-
-
+plot_title = sys.argv[1]
 
 ### load params
 days_per_month = config.days_per_month
@@ -29,80 +21,43 @@ timesteps_per_year = config.timesteps_per_year
 num_windows = config.num_windows
 nonmissing_required = config.nonmissing_required
 
-
-
 ### load observed data
-fp = wd + "/Out/preprocessed_obs.sav"
+fp = config.wd + "/Out/preprocessed_obs.sav"
 data0 = torch.load(fp, weights_only=False)
 X_obs = data0['X']
 Y_obs = data0['Y']
 Z_obs = data0['Z']
-print(X_obs.shape)
-print(Y_obs.shape)
-print(Z_obs.shape)
 X_vars_obs = data0['X_vars']
 Y_vars_obs = data0['Y_vars']
-print(Y_vars_obs, flush=True)
 Z_vars_obs = data0['Z_vars']
 X_stats = data0['X_stats']
 Y_stats = data0['Y_stats']
-print(X_vars_obs, flush=True)
-#print(Y_vars, flush=True)
-print(Z_vars_obs, flush=True)
-print(X_vars_obs, flush=True)
-print(X_obs.shape, flush=True)
-print(Y_obs.shape, flush=True)
-print(Z_obs.shape, flush=True)
-
-
 
 ### Separate out F_CH4 (into variable "M")
-
 # create new var
 mind = list(X_vars_obs).index("FCH4")
 M_obs = deepcopy(X_obs[:,:,mind])
 M_vars_obs = deepcopy(X_vars_obs[mind])
 M_stats = deepcopy(X_stats[mind, :])
-print(M_vars_obs, M_obs.shape, M_stats)
 
 # remove from X
 X_obs = np.delete(X_obs, mind, axis=2)
 X_vars_obs = np.delete(X_vars_obs, mind)
 X_stats = np.delete(X_stats, mind, axis=0)
 
-print(X_obs.shape)
-print(X_vars_obs)
-print(X_stats.shape)
-
-
-
 ### Separate out FCH4_F_ANNOPTLM (into variable "G")
-
 # create new var
 gind = list(X_vars_obs).index("FCH4_F_ANNOPTLM")
 G_obs = X_obs[:,:,gind]
 G_vars_obs = X_vars_obs[gind]
 G_stats = deepcopy(X_stats[gind, :])
-print(G_vars_obs, G_obs.shape, G_stats)
 
 # remove from X
 X_obs = np.delete(X_obs, gind, axis=2)
 X_vars_obs = np.delete(X_vars_obs, gind)
 X_stats = np.delete(X_stats, gind, axis=0)
 
-print(X_obs.shape)
-print(X_vars_obs)
-print(X_stats.shape)
-
-
-
 ### prep and filter time windows
-print(X_obs.shape)
-print(Y_obs.shape)
-print(Z_obs.shape)
-print(M_obs.shape)
-print(G_obs.shape)
- 
 # chunk up train sites into windows
 new_X, new_Y, new_Z, new_M, new_G = [],[],[],[],[]
 num_sites = X_obs.shape[0]
@@ -110,12 +65,11 @@ for site in range(num_sites):
     new_site_x, new_site_y, new_site_z, new_site_m, new_site_g = [],[],[],[],[]
     for it in range(num_windows):
         window_range_in = range(timesteps_per_year*it,timesteps_per_year*it+(timesteps_per_year*2))  # window of (smaller) input
-        x_piece = X_obs[site, window_range_in, :]#.to(device)
-        y_piece = Y_obs[site, window_range_in, 0]#.to(device)
-        z_piece = Z_obs[site, window_range_in, :]#.to(device)
-        m_piece = M_obs[site, window_range_in]#.to(device)
-        g_piece = G_obs[site, window_range_in]#.to(device)
-        # print(x_piece.shape, y_piece.shape, z_piece.shape)  # torch.Size([24, 6]) torch.Size([24]) torch.Size([24, 3])
+        x_piece = X_obs[site, window_range_in, :]
+        y_piece = Y_obs[site, window_range_in, 0]
+        z_piece = Z_obs[site, window_range_in, :]
+        m_piece = M_obs[site, window_range_in]
+        g_piece = G_obs[site, window_range_in]
 
         # year 1
         x_piece_1 = x_piece[0:timesteps_per_year, :]
@@ -149,10 +103,7 @@ for site in range(num_sites):
 
         # third check: do we have enough months with non-missing data in year 2?
         if torch.sum(y_missing_2) <= (timesteps_per_year-nonmissing_required):
-            #print(np.sum(np.array(np.isnan(y_piece))))
-            #y_piece = torch.nan_to_num(y_piece, nan=-999)  # replace nan with -999 for the custom loss
             y_piece = np.expand_dims(y_piece, axis=-1)
-            #print(x_piece.shape, y_piece.shape, z_piece.shape)
             new_site_x.append(x_piece)
             new_site_y.append(y_piece)
             new_site_z.append(z_piece)
@@ -169,16 +120,12 @@ for site in range(num_sites):
     new_Z.append(torch.tensor(np.array(new_site_z)))
     new_M.append(torch.tensor(np.array(new_site_m)))
     new_G.append(torch.tensor(np.array(new_site_g)))
-
+#
 X_obs_windows = list(new_X)
 Y_obs_windows = list(new_Y)
 Z_obs_windows = list(new_Z)
 M_obs_windows = list(new_M)
 G_obs_windows = list(new_G)
-print(len(X_obs_windows), len(Y_obs_windows), len(Z_obs_windows), len(M_obs_windows), len(G_obs_windows))
-print(X_obs_windows[0].shape, Y_obs_windows[0].shape, Z_obs_windows[0].shape, M_obs_windows[0].shape, G_obs_windows[0].shape)
-
-
 
 ### initial organization
 num_sites = X_obs.shape[0]
@@ -187,8 +134,6 @@ X_temp = deepcopy(X_obs_windows)
 FCH4 = deepcopy(M_obs_windows) 
 FCH4_F_ANNOPTLM = deepcopy(G_obs_windows) 
 
-
-
 ### load outputs
 outputs = []
 X_test = []
@@ -196,7 +141,7 @@ for site in range(num_sites):
     new_site = []
     for rep in range(num_reps):
         new_rep = []
-        path_out = output_path + 'results_site_' + str(site) + "_rep_" + str(rep) + '.txt'
+        path_out = config.fp_eval + '/results_site_' + str(site) + "_rep_" + str(rep) + '.txt'
 
         if os.path.exists(path_out) is False:
             pass 
@@ -215,7 +160,6 @@ for site in range(num_sites):
 
     # average across reps
     if len(new_site) > 0:
-        print(site, "len(new_site)", len(new_site))
         new_site = np.array(new_site)  # (num_reps, num_windows, window_size)        
         if len(new_site.shape) < 3:
             print("expecting more reps to average, or just write code to deal with this")
@@ -224,7 +168,6 @@ for site in range(num_sites):
         outputs.append(new_site)
         X_test.append(X_temp[site])
     else:
-        print(site, "len(new_site)", len(new_site), "— missing")
         outputs.append("missing")
         X_test.append("missing")      
 
@@ -253,16 +196,12 @@ for i in range(len(outputs)):
         FCH4_F_ANNOPTLM[i][missing] = np.nan 
         # (outputs is never -9999)
 
-
-
 ### un-normalize
 for i in range(num_sites):
     if "missing" not in outputs[i]:
         outputs[i] = ((outputs[i] * Y_stats[0,1]) + Y_stats[0,0]) / 1000
         FCH4[i] = ((FCH4[i] * M_stats[1]) + M_stats[0]) /1000 
         FCH4_F_ANNOPTLM[i] = ((FCH4_F_ANNOPTLM[i] * G_stats[1]) + G_stats[0]) /1000 
-
-
 
 ### fxn to split windows/years into "valid", complete windows, and incomplete windows
 def complete_windows(FCH4, FCH4_F_ANNOPTLM, outputs, site):
@@ -282,8 +221,6 @@ def complete_windows(FCH4, FCH4_F_ANNOPTLM, outputs, site):
     #
     return complete_true, missing_true, complete_est, missing_est
 
-
-
 ### fxn to calculate yearly emissions
 def yearly(timeseries):
     days_per_month = [31,28,31,30,31,30,31,31,30,31,30,31]
@@ -292,8 +229,6 @@ def yearly(timeseries):
         if not np.isnan(timeseries[month]):  # skip nans
             tot += timeseries[month] * days_per_month[month]
     return tot
-
-
 
 ### site means and squared errors
 true_site_means_valid = []
@@ -360,19 +295,12 @@ for i in range(num_sites):
             annual_variation_missing.append( np.std(annual_sums_true) )
             ses_missing.append( np.nanmean(squared_errors) )
 
-
-
 ### MSE
-
 # sites with complete years
 mse_valid = np.sqrt(np.mean(ses_valid))
-print(mse_valid)
 
 # including sites with missing months
 mse_missing = np.sqrt(np.mean(ses_missing))
-print(mse_missing)
-
-
 
 ### r2
 
@@ -380,27 +308,18 @@ print(mse_missing)
 r2_valid = r2_score(torch.tensor(true_site_means_valid), torch.tensor(est_site_means_valid))
 if r2_valid < 0:
     r2_valid = "<0"
-print(r2_valid)
 
 # including sites with missing months
 r2_missing = r2_score(torch.tensor(true_site_means_missing), torch.tensor(est_site_means_missing))
 if r2_missing < 0:
     r2_missing = "<0"
-print(r2_missing)
-
-
 
 ### correlation
-
 # complete sites
 corr_valid = np.corrcoef(torch.tensor(true_site_means_valid), torch.tensor(est_site_means_valid))
-print(corr_valid)
 
 # including sites with missing months
 corr = np.corrcoef(torch.tensor(true_site_means_missing), torch.tensor(est_site_means_missing))
-print(corr)
-
-
 
 ### scatter
 fig, ax = plt.subplots(figsize=(5, 5)) 
