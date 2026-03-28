@@ -32,9 +32,9 @@ class cnn_branch(nn.Module):
         return output
 
 
-class model_stack_wCNN(nn.Module):
+class gru_w_cnn(nn.Module):
     def __init__(self, ninp, nhid=8, nlayers=2, nout1=1, dropout=0):
-        super(pureML_GRU, self).__init__()
+        super(gru_w_cnn, self).__init__()
         self.num_classes=3
         self.gru = nn.GRU(ninp+self.num_classes, nhid, nlayers,dropout=dropout, batch_first=True)
         self.densor_flux = nn.Linear(nhid, nout1)
@@ -64,7 +64,7 @@ class model_stack_wCNN(nn.Module):
     
 class gru(nn.Module):
     def __init__(self, ninp, nhid=8, nlayers=2, nout1=1, dropout=0):
-        super(pureML_GRU, self).__init__()
+        super(gru, self).__init__()
         self.gru = nn.GRU(ninp, nhid,nlayers,dropout=dropout, batch_first=True)
         self.densor_flux = nn.Linear(nhid, nout1)
         self.nhid = nhid
@@ -81,7 +81,6 @@ class gru(nn.Module):
     def forward(self, inputs, hidden):
         output, hidden = self.gru(inputs, hidden)
         output1 = self.densor_flux(self.drop(output))
-        
         return output1, hidden
 
     def init_hidden(self, bsz):
@@ -142,7 +141,7 @@ class domain_classifier(nn.Module):
 
 class doman_adapt(nn.Module):
     def __init__(self, input_dim, hidden_dim, lambda_):
-        super(combined_nn, self).__init__()
+        super(domain_adapt, self).__init__()
         self.feature_extractor = feature_extractor(input_dim, hidden_dim)
         self.output_branch = output_branch()
         self.domain_classifier = domain_classifier(lambda_)
@@ -152,3 +151,5 @@ class doman_adapt(nn.Module):
         output = self.output_branch(features)
         domain = self.domain_classifier(features)
         return output, domain  # torch.Size([bsz, 12, 1]) torch.Size([bsz, 12, 1])    
+
+

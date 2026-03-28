@@ -333,7 +333,7 @@ for i in range(run*n, (run*n)+n):
                     # load up model
                     fp = config.config.fp_train + "/production_rep_" + str(rep) + ".sav"
                     checkpoint=torch.load(fp, map_location=torch.device('cpu'), weights_only=False)
-                    model=model_stack_wCNN(7,n_a,n_l,1,dropout)
+                    model=model_stack(7,n_a,n_l,1,dropout)
                     model.load_state_dict(checkpoint['model_state_dict'])
                     model.to(device)
                     model.eval()    

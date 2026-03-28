@@ -327,7 +327,7 @@ val_losses = []
 ### initialize model
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 dropout = 0
-model = model_stack_wCNN(len(X_vars_obs),n_a,n_l,1,dropout)
+model = model_stack(len(X_vars_obs),n_a,n_l,1,dropout)
 model.to(device)
 params = list(model.parameters())
     
@@ -496,7 +496,7 @@ with torch.no_grad():
         I_test = I_obs_windows[test_ind]
         test_n = len(X_test)
         checkpoint=torch.load(pretrain_path, map_location=torch.device('cpu'), weights_only=False)
-        model=model_stack_wCNN(6,n_a,n_l,1,dropout)
+        model=model_stack(6,n_a,n_l,1,dropout)
         model.load_state_dict(checkpoint['model_state_dict'])
         model.to(device) #too large for GPU, kif not enough, change to cpu
         model.eval()  # this is "testing" model, it switches off dropout and batch norm.
@@ -595,7 +595,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print('Using device:', device, flush=True)
 
 dropout = 0
-model = model_stack_wCNN(X_obs_windows[0].shape[-1],n_a,n_l,1,dropout)
+model = model_stack(X_obs_windows[0].shape[-1],n_a,n_l,1,dropout)
 model.to(device) #too large for GPU, kif not enough, change to cpu
 
 params = list(model.parameters())
@@ -736,7 +736,7 @@ else:
 
     with torch.no_grad():
         checkpoint=torch.load(finetune_path, map_location=torch.device('cpu'), weights_only=False)
-        model=model_stack_wCNN(X_obs_windows[0].shape[-1],n_a,n_l,1,dropout)
+        model=model_stack(X_obs_windows[0].shape[-1],n_a,n_l,1,dropout)
         model.load_state_dict(checkpoint['model_state_dict'])
         model.to(device) #too large for GPU, kif not enough, change to cpu
         model.eval()  # this is "testing" model, it switches off dropout and batch norm.
