@@ -1,4 +1,6 @@
-// model-stacking
+// mixture model
+
+
 
 params.each { k, v -> 
     println "- $k = $v"
@@ -9,7 +11,7 @@ workflow {
     // preprocess FLUXNET
     prep_fluxnet = Preprocess_FLUXNET()
 
-    // Preprocess TEM and reanalysis data
+    // preprocess TEM and reanalysis data
     prep_tem = Preprocess_TEM()
 
     // preprocess specific to model
@@ -136,6 +138,6 @@ process Eval {
     script:
     """                                                                                                                            
     python ${params.repo}/Code/evaluate.py \
-        "Cross domain model stacking"                                                                                                            
+        "Mixture model"                                                                                                            
     """
 }

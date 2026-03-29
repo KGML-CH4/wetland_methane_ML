@@ -1,4 +1,4 @@
-// model-stacking plus CNN
+// mixture model plus CNN
 
 
 
@@ -9,7 +9,7 @@ println "=============================\n"
 
 workflow {
     // preprocess FLUXNET
-    prep_fluxnet = Preprocess_FLUXNET(modis_prepped)
+    prep_fluxnet = Preprocess_FLUXNET()
 
     // download MODIS images at fluxnet sites
     modis_fluxnet = Download_MODIS_fluxnet(prep_fluxnet)
@@ -32,7 +32,7 @@ workflow {
     prep_modis = prep_modis.collect()
     modis_prepped = Prep_MODIS_global_4(prep_modis)
 
-    // preprocess specific to model-stacking plus CNN
+    // preprocess specific to model
     prep_model = Preprocess_model(modis_fluxnet, prep_tem, modis_prepped)
 
     // train
@@ -286,6 +286,6 @@ process Eval {
     script:
     """                                                                                                                            
     python ${params.repo}/Code/evaluate.py \
-        "Cross domain model stacking"                                                                                                            
+        "Mixture model plus CNN"
     """
 }
