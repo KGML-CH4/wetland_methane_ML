@@ -1,7 +1,3 @@
-// model-stacking plus CNN
-
-
-
 params.each { k, v -> 
     println "- $k = $v"
 }
@@ -300,9 +296,8 @@ process Eval {
     path "evaluation.pdf"
     
     script:
-    """                                                                                                                            
-    python ${params.repo}/Code/evaluate.py \
-        "Model stacking plus CNN"                                                                                                            
+    """
+    python ${params.repo}/Code/evaluate.py
     """
 }
 

@@ -13,8 +13,6 @@ from sklearn.metrics import r2_score
 import config
 import utils
 
-plot_title = sys.argv[1]
-
 ### load params
 days_per_month = config.days_per_month
 timesteps_per_year = config.timesteps_per_year
@@ -325,7 +323,7 @@ corr = np.corrcoef(torch.tensor(true_site_means_missing), torch.tensor(est_site_
 fig, ax = plt.subplots(figsize=(5, 5)) 
 plt.tight_layout()
 units=["(g C $m^{-2}$ $year^{-1}$)"]
-ax.set_title(plot_title, fontsize = 15,weight='bold')
+#ax.set_title(plot_title, fontsize = 15,weight='bold')
 ax.set_xlabel('True '+units[0],fontsize = 15)
 ax.set_ylabel('Estimated',fontsize = 15)
 lim_min=-25

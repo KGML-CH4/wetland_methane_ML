@@ -1,7 +1,3 @@
-// mixture model plus CNN
-
-
-
 params.each { k, v -> 
     println "- $k = $v"
 }

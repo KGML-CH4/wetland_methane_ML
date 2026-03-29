@@ -1,7 +1,3 @@
-// mixture model
-
-
-
 params.each { k, v -> 
     println "- $k = $v"
 }
@@ -11,7 +7,7 @@ workflow {
     // preprocess FLUXNET
     prep_fluxnet = Preprocess_FLUXNET()
 
-    // preprocess TEM and reanalysis data
+    // Preprocess TEM and reanalysis data
     prep_tem = Preprocess_TEM()
 
     // preprocess specific to model
@@ -136,8 +132,7 @@ process Eval {
     path "evaluation.pdf"
     
     script:
-    """                                                                                                                            
-    python ${params.repo}/Code/evaluate.py \
-        "Mixture model"                                                                                                            
+    """
+    python ${params.repo}/Code/evaluate.py
     """
 }
