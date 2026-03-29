@@ -88,7 +88,7 @@ process Preprocess_model() {
 
     script:
     """
-    python ${params.repo}/Code/${params.repo}/preprocess.py
+    python ${params.repo}/Code/preprocess_ml.py
     """
 }
 

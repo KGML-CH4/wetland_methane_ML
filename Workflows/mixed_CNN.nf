@@ -44,22 +44,6 @@ workflow {
 
     // evaluate
     test = Eval(trained)
-
-    // preprocess for upscaling (using separate wetland map)
-    prep_upscale_wad2m = Preprocess_upscale_WAD2M(test)
-
-    // train for upscaling (nothing held-out)
-    ch_f = Channel.of( 1..(params.num_reps) )
-    trained_upscale_wad2m = Upscale_train_WAD2M(prep_upscale_wad2m, ch_f)
-    trained_upscale_wad2m = trained_upscale_wad2m.collect()
-
-    // predict every grid cell
-    ch_g = Channel.of( 1..100 )    
-    upscaled_wad2m = Upscale_WAD2M(trained_upscale_wad2m, ch_g)
-    upscaled_wad2m = upscaled_wad2m.collect()
-
-    // final upscaling analysis and plots
-    Global_plot_WAD2m(upscaled_wad2m)    
 }
 
 
@@ -303,98 +287,5 @@ process Eval {
     """                                                                                                                            
     python ${params.repo}/Code/evaluate.py \
         "Cross domain model stacking"                                                                                                            
-    """
-}
-
-
-
-process Preprocess_upscale_WAD2M {
-    // resources
-    memory '200 GB'
-    time '4h'
-
-    // misc. settings
-    publishDir "${params.workdir}/Out/Upscale_WAD2M/", mode: 'copy'
-    tag "preprocess_upscale_wad2m"
-    conda "${params.repo}/requirements.yml"
-
-    output:
-    path "prep_upscale_WAD2M.sav"
-
-    script:
-    """
-    python ${params.repo}/Code/${params.repo}/preprocess_upscale_WAD2M.py
-    """
-}
-
-
-
-process Upscale_train_WAD2M {
-    // resources
-    memory '50 GB'
-    time '1h'
-
-    // misc. settings
-    publishDir "${params.workdir}/Out/Upscale_WAD2M/", mode: 'copy'
-    tag "train_upscale_${rep}"
-    conda "${params.repo}/requirements.yml"
-
-    input:
-    tuple int(rep)
-
-    output:
-    path "production_rep_${rep}.sav"
-
-    script:
-    """
-    python ${params.repo}/Code/${params.repo}/train.py \
-        0 \
-        ${rep}
-    """
-}
-
-
-
-
-process Upscale_WAD2M {
-    // resources
-    memory '50 GB'
-    time '24h'
-
-    // misc. settings
-    publishDir "${params.workdir}/Out/Upscale_WAD2M/", mode: 'copy'
-    tag "upscale_wad2m"
-    conda "${params.repo}/requirements.yml"
-
-    input: int(rep)
-
-    output:
-    path "upscale_wad2m_${rep}.txt"
-
-    script:
-    """
-    python ${params.repo}/Code/${params.repo}/upscale_WAD2M.py ${rep}
-    echo "Done." > upscale_wad2m_${rep}.txt
-    """
-}
-
-
-
-process Global_plot_WAD2m {
-    // resources
-    memory '200 GB'
-    time '2h'
-
-    // misc. settings
-    publishDir "${params.workdir}/Out/Upscale_WAD2M/", mode: 'copy'
-    tag "plot_upscale_wad2m"
-    conda "${params.repo}/requirements.yml"
-
-    output:
-    path "hybrid.pdf"
-
-    script:
-    """
-    python ${params.repo}/Code/${params.repo}/plot.py
     """
 }
