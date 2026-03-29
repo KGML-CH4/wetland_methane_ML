@@ -88,7 +88,7 @@ process Preprocess_model() {
 
     script:
     """
-    python ${params.repo}/Code/Model_stacking/preprocess.py
+    python ${params.repo}/Code/${params.repo}/preprocess.py
     """
 }
 
@@ -112,7 +112,7 @@ process Train {
 
     script:
     """
-    python ${params.repo}/Code/Model_stacking/train.py \
+    python ${params.repo}/Code/${params.repo}/train.py \
         ${test_index} \
         ${rep}
     """

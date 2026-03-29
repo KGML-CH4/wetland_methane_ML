@@ -254,7 +254,7 @@ process Preprocess_model() {
 
     script:
     """
-    python ${params.repo}/Code/Model_stacking_CNN/preprocess.py
+    python ${params.repo}/Code/${params.repo}/preprocess.py
     """
 }
 
@@ -278,7 +278,7 @@ process Train {
 
     script:
     """
-    python ${params.repo}/Code/Model_stacking_CNN/train.py \
+    python ${params.repo}/Code/${params.repo}/train.py \
         ${test_index} \
         ${rep}
     """
@@ -323,7 +323,7 @@ process Preprocess_upscale_WAD2M {
 
     script:
     """
-    python ${params.repo}/Code/Model_stacking_CNN/preprocess_upscale_WAD2M.py
+    python ${params.repo}/Code/${params.repo}/preprocess_upscale_WAD2M.py
     """
 }
 
@@ -347,7 +347,7 @@ process Upscale_train_WAD2M {
 
     script:
     """
-    python ${params.repo}/Code/Model_stacking_CNN/train.py \
+    python ${params.repo}/Code/${params.repo}/train.py \
         0 \
         ${rep}
     """
@@ -373,7 +373,7 @@ process Upscale_WAD2M {
 
     script:
     """
-    python ${params.repo}/Code/Model_stacking_CNN/upscale_WAD2M.py ${rep}
+    python ${params.repo}/Code/${params.repo}/upscale_WAD2M.py ${rep}
     echo "Done." > upscale_wad2m_${rep}.txt
     """
 }
@@ -395,6 +395,6 @@ process Global_plot_WAD2m {
 
     script:
     """
-    python ${params.repo}/Code/Model_stacking_CNN/plot.py
+    python ${params.repo}/Code/${params.repo}/plot.py
     """
 }

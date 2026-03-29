@@ -20,11 +20,11 @@ rep = int(sys.argv[2])
 
 ### file paths
 path_out = config.fp_train + '/result_' + str(hold_out_site) + "_rep_" + str(rep) + '.txt'
-pretrain_path = config.fp_train + '/pretrain_' + str(model_version) + "_" + str(hold_out_site) + "_rep_" + str(rep) + '.sav'
+pretrain_path = config.fp_train + '/pretrain_' + config.model_version + "_" + str(hold_out_site) + "_rep_" + str(rep) + '.sav'
 if hold_out_site == 0:
     finetune_path = config.fp_train + '/production_rep_' + str(rep) + '.sav'
 else:
-    finetune_path = config.fp_train + '/finetune_' + str(model_version) + "_" + str(hold_out_site) + "_rep_" + str(rep) + '.sav'
+    finetune_path = config.fp_train + '/finetune_' + config.model_version + "_" + str(hold_out_site) + "_rep_" + str(rep) + '.sav'
     
 ### params
 start_year, end_year = config.start_year, config.end_year
