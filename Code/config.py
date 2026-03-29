@@ -2,7 +2,17 @@ import numpy as np
 
 # change
 wd = "temp_ch4/"
-model_version = "/modelStackCNN/"
+#model_version = "/TEM/"
+#model_version = "/TEM_surrogate/"
+#model_version = "/GRU/"
+#model_version = "/Pretrain/"
+#model_version = "/DomainAdapt/"
+#model_version = "/Mixed/"
+#model_version = "/ModelStack/"
+#model_version = "/GRU_CNN/"
+#model_version = "/Pretrain_CNN/"
+#model_version = "/Mixed_CNN/"
+model_version = "/ModelStackCNN/"
 
 # general settings
 start_year, end_year = 2006,2018

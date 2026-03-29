@@ -51,13 +51,11 @@ data0 = torch.load(config.fp_prep_fluxnet, weights_only=False)
 X_obs = data0['X']
 Y_obs = data0['Y']
 Z_obs = data0['Z']
-I_obs = data0['I']
 X_vars_obs = data0['X_vars']
 Y_vars_obs = data0['Y_vars']
 Z_vars_obs = data0['Z_vars']
 X_stats = data0['X_stats']
 Y_stats = data0['Y_stats']
-I_stats = data0['I_stats']
 ids = np.arange(X_obs.shape[0])  # site ID: this notebook is splitting by site ID—no option for random split
 
 ### Separate out F_CH4 (into variable "M")
@@ -96,12 +94,10 @@ for site in range(num_sites):
         z_piece = Z_obs[site, window_range_in, :]#.to(device)
         m_piece = M_obs[site, window_range_in]#.to(device)
         g_piece = G_obs[site, window_range_in]#.to(device)
-        i_piece = I_obs[site, window_range_in]#.to(device)
 
         # year 1
         x_piece_1 = x_piece[0:timesteps_per_year, :]
         y_piece_1 = y_piece[0:timesteps_per_year]
-        i_piece_1 = y_piece[0:timesteps_per_year]
 
         # first check: are inputs consistently missing for each time step? I would it expect the model to get tripped up otherwise.
         # (rather, instead of checking, just assigning missing to all inputs where there is at least one missing)
@@ -109,14 +105,12 @@ for site in range(num_sites):
         for month in range(timesteps_per_year):
             if x_missing_1[month] == True: # if any is missing, replace all with missing
                 x_piece[month, :] = -9999  # note this is the "full" x_piece that gets passed through
-                i_piece[month] = -9999                        
 
         # (skipping filter on missing data in year-1, i.e., it can be all missing)
                 
         # year 2
         x_piece_2 = x_piece[timesteps_per_year:(timesteps_per_year*2), :]
         y_piece_2 = y_piece[timesteps_per_year:(timesteps_per_year*2)]
-        i_piece_2 = i_piece[timesteps_per_year:(timesteps_per_year*2)]
         
         # second check: do positions of missing x values == missing y value positions?
         # We cannot expect the model to output a good estimate for, say, January, if there are no inputs.
@@ -129,7 +123,6 @@ for site in range(num_sites):
                 y_piece_2[month] = -9999
                 x_piece[month + timesteps_per_year, :] = -9999  # (+timesteps_per_year because we're modifying second year of the "full" x_piece)
                 y_piece[month + timesteps_per_year] = -9999
-                i_piece[month + timesteps_per_year, :] = -9999  
         # 
         x_missing_2 = (x_piece_2 == -9999).any(dim=1)  # re-counting after adding nans
         y_missing_2 = (y_piece_2 == -9999)  
@@ -142,7 +135,6 @@ for site in range(num_sites):
             new_site_z.append(z_piece)
             new_site_m.append(m_piece)
             new_site_g.append(g_piece)
-            new_site_i.append(i_piece)
 
     # add site to 4d list
     if len(new_site_x) > 0:
@@ -154,14 +146,12 @@ for site in range(num_sites):
     new_Z.append(torch.tensor(np.array(new_site_z)))
     new_M.append(torch.tensor(np.array(new_site_m)))
     new_G.append(torch.tensor(np.array(new_site_g)))
-    new_I.append(torch.tensor(np.array(new_site_i)))
 
 X_obs_windows = list(new_X)
 Y_obs_windows = list(new_Y)
 Z_obs_windows = list(new_Z)
 M_obs_windows = list(new_M)
 G_obs_windows = list(new_G)
-I_obs_windows = list(new_I)
 
 ### load simulated data
 data0 = torch.load(config.fp_prep_TEM, weights_only=False)
@@ -327,7 +317,7 @@ val_losses = []
 ### initialize model
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 dropout = 0
-model = gru_w_cnn(len(X_vars_obs),n_a,n_l,1,dropout)
+model = gru(len(X_vars_obs),n_a,n_l,1,dropout)
 model.to(device)
 params = list(model.parameters())
     
@@ -338,53 +328,6 @@ optimizer = optim.Adam(model.parameters(), lr=lr_adam) #add weight decay normall
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=patience, factor=factor)
 maxepoch=100
 
-def load_tile(epoch):
-    means = np.load(config.fp_modis_tiles + "/global_means.npy")
-    sds = np.load(config.fp_modis_tiles + "/global_SDs.npy")
-    tile = np.load(config.fp_modis_tiles + "/tile_" + str(epoch) + ".npy")  # (12519, 156, 7, 10, 10)
-    
-    # normalize
-    means = means.reshape(1, 1, 7, 1, 1)
-    tile = tile - means
-    sds = sds.reshape(1, 1, 7, 1, 1)
-    tile = tile / sds
-    
-    # remove fluxnet sites
-    tile = tile[good_sites_sim]  # (12499, 156, 7, 10, 10)
-    
-    # filter for approved windows
-    new_tile = []  # 12498
-    for site in range(len(windowed_indices_sim)):
-        new_site = []
-        for it in windowed_indices_sim[site]:  # this skips any windows that aren't pre-approved
-            window_range_in = range(timesteps_per_year*it,timesteps_per_year*it+(timesteps_per_year*2))
-            new_site.append(tile[site, window_range_in, :, :, :])
-        #
-        if len(new_site) > 0:
-            new_tile.append(torch.tensor(np.array(new_site)))
-    #
-    del tile
-    gc.collect()
-    
-    # train val test split
-    train_frac=0.7; val_frac=0.3
-    sample_size = len(new_tile)
-    train_n=int(train_frac*sample_size)
-    val_n=int(val_frac*sample_size)
-    I_train_sim, I_val_sim, I_test_sim = [],[],[]
-    for i in range(train_n):
-        I_train_sim.append(new_tile[shuffled_ind[i]])
-    for i in range(train_n, train_n+val_n):
-        I_val_sim.append(new_tile[shuffled_ind[i]])
-    I_train_sim = torch.cat(I_train_sim, dim=0)
-    I_val_sim = torch.cat(I_val_sim, dim=0)
-    I_train_sim = I_train_sim.to(torch.float32)
-    I_val_sim = I_val_sim.to(torch.float32)
-    del new_tile
-    gc.collect()
-    
-    return I_train_sim, I_val_sim
-
 ### train
 train_n = X_train_sim.size(0)
 val_n = X_val_sim.size(0)
@@ -393,16 +336,11 @@ X_val = X_val_sim.to(device)
 Y_val = Y_val_sim.to(device)
 for epoch in range(maxepoch):
 
-    # load image data
-    I_train_sim, I_val_sim = load_tile(epoch)
-    I_val_sim = I_val_sim.to(device)
-    
     train_loss=0.0
     val_loss=0.0
     shuffled_b=torch.randperm(X_train_sim.size(0)) 
     X_train_shuff=X_train_sim[shuffled_b,:,:] 
     Y_train_shuff=Y_train_sim[shuffled_b,:,:]
-    I_train_shuff=I_train_sim[shuffled_b,:,:]
     
     # forward
     model.train()  # (switch on dropout; and optimization?)
@@ -418,9 +356,8 @@ for epoch in range(maxepoch):
         optimizer.zero_grad()
         X_input = X_train_shuff[sbb:ebb, :, :].to(device)
         Y_true = Y_train_shuff[sbb:ebb, :, :].to(device)
-        I_input = I_train_shuff[sbb:ebb].to(device)
 
-        Y_est, _ = model(I_input, X_input, hidden)
+        Y_est, _ = model(X_input, hidden)
 
         Y_est = Y_est[:,timesteps_per_year:(timesteps_per_year*2),:]  # chopping off the first year, that was spin-up
         Y_true = Y_true[:,timesteps_per_year:(timesteps_per_year*2),:]
@@ -442,7 +379,7 @@ for epoch in range(maxepoch):
         train_losses.append(train_loss)
         
         hidden = model.init_hidden(X_val.shape[0]).to(device)
-        Y_val_pred_t, _ = model(I_val_sim, X_val, hidden)
+        Y_val_pred_t, _ = model(X_val, hidden)
         
         Y_val_pred_t = Y_val_pred_t[:,timesteps_per_year:(timesteps_per_year*2),:]  # chopping off the first year, that was spin-up
         
@@ -476,16 +413,12 @@ for epoch in range(maxepoch):
 
 print("final train_loss:",train_loss,"val_loss:",val_loss,"val loss best:",loss_val_best, flush=True)
 
-del I_train_sim, I_val_sim
-gc.collect()
-
 ### forward pass to get TEM predictions
-def check_results(total_b, check_xset, check_y1set, I_input):
+def check_results(total_b, check_xset, check_y1set):
     hidden = model.init_hidden(total_b)
     X_input = check_xset.to(device).float()
     Y_true = check_y1set.to(device)
-    I_input = I_input.to(device).float()
-    Y1_pred_t, _ = model(I_input, X_input, hidden)            
+    Y1_pred_t, _ = model(X_input, hidden)            
     return Y1_pred_t
 
 outputs = []
@@ -493,16 +426,15 @@ with torch.no_grad():
     for test_ind in range(len(X_obs_windows)):
         X_test = X_obs_windows[test_ind]
         Y_test = Y_obs_windows[test_ind]
-        I_test = I_obs_windows[test_ind]
         test_n = len(X_test)
         checkpoint=torch.load(pretrain_path, map_location=torch.device('cpu'), weights_only=False)
-        model=gru_w_cnn(6,n_a,n_l,1,dropout)
+        model=gru(6,n_a,n_l,1,dropout)
         model.load_state_dict(checkpoint['model_state_dict'])
         model.to(device) #too large for GPU, kif not enough, change to cpu
         model.eval()  # this is "testing" model, it switches off dropout and batch norm.
         epoch = checkpoint['epoch']
         print("epoch", epoch, flush=True)
-        Y_test_pred =  check_results(test_n, X_test, Y_test, I_test)    
+        Y_test_pred =  check_results(test_n, X_test, Y_test)    
         outputs.append(Y_test_pred)
 
 ### process TEM predictions
@@ -546,7 +478,6 @@ else:
     Y_test = Y_obs_windows[hold_out_site]
     Z_test = Z_obs_windows[hold_out_site]
     M_test = M_obs_windows[hold_out_site]
-    I_test = I_obs_windows[hold_out_site]
     if len(X_test) == 0:
         print("\n\n\n\t test data empty\n\n\n")
         sys.exit()
@@ -556,7 +487,6 @@ X_temp = deepcopy(X_obs_windows)
 Y_temp = deepcopy(Y_obs_windows)
 Z_temp = deepcopy(Z_obs_windows)
 M_temp = deepcopy(M_obs_windows)
-I_temp = deepcopy(I_obs_windows)
 if hold_out_site == 0:
     pass  # production run; include all data                                                                                    
 else:
@@ -564,7 +494,6 @@ else:
     del Y_temp[hold_out_site]
     del Z_temp[hold_out_site]
     del M_temp[hold_out_site]
-    del I_temp[hold_out_site]
 #
 shuffled_ind = torch.randperm(len(X_temp))
 
@@ -580,10 +509,6 @@ Z_train, Z_val = utils.split_data_group(Z_temp,shuffled_ind)
 # M
 M_train, M_val = utils.split_data_group(M_temp,shuffled_ind)
 
-# I
-I_train, I_val = utils.split_data_group(I_temp,shuffled_ind)
-
-
 ### initialize params for training
 loss_val_best = 999999
 best_epoch = 9999
@@ -595,7 +520,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print('Using device:', device, flush=True)
 
 dropout = 0
-model = gru_w_cnn(X_obs_windows[0].shape[-1],n_a,n_l,1,dropout)
+model = gru(X_obs_windows[0].shape[-1],n_a,n_l,1,dropout)
 model.to(device) #too large for GPU, kif not enough, change to cpu
 
 params = list(model.parameters())
@@ -611,7 +536,6 @@ val_n = X_val.size(0)
 test_n = X_test.size(0)
 X_val = X_val.to(device)
 Y_val = Y_val.to(device)
-I_val = I_val.to(device)
 
 for epoch in range(maxepoch):
     train_loss=0.0
@@ -619,7 +543,6 @@ for epoch in range(maxepoch):
     shuffled_b=torch.randperm(X_train.size(0)) 
     X_train_shuff=X_train[shuffled_b,:,:] 
     Y_train_shuff=Y_train[shuffled_b,:,:]
-    I_train_shuff=I_train[shuffled_b,:,:]
     
     # forward
     model.train()  # (switch on dropout; and optimization?)
@@ -635,15 +558,8 @@ for epoch in range(maxepoch):
         optimizer.zero_grad()
         X_input = X_train_shuff[sbb:ebb, :, :].to(device)
         Y_true = Y_train_shuff[sbb:ebb, :, :].to(device)
-        I_input = I_train_shuff[sbb:ebb].to(device)
         
-        # augment images
-        B, T, C, H, W = I_input.shape
-        I_input = I_input.view(B * T, C, H, W)
-        I_input = torch.stack([utils.random_flip_rotate(img) for img in I_input])
-        I_input = I_input.view(B, T, C, H, W)
-        
-        Y_est, _ = model(I_input, X_input, hidden)
+        Y_est, _ = model(X_input, hidden)
         Y_est = Y_est[:,timesteps_per_year:(timesteps_per_year*2),:]  # chopping off the first year, that was spin-up
         Y_true = Y_true[:,timesteps_per_year:(timesteps_per_year*2),:]
         
@@ -664,7 +580,7 @@ for epoch in range(maxepoch):
         train_losses.append(train_loss)
         
         hidden = model.init_hidden(X_val.shape[0]).to(device)
-        Y_val_pred_t, _ = model(I_val, X_val, hidden)
+        Y_val_pred_t, _ = model(X_val, hidden)
         
         Y_val_pred_t = Y_val_pred_t[:,timesteps_per_year:(timesteps_per_year*2),:]  # chopping off the first year, that was spin-up
         
@@ -705,7 +621,7 @@ if hold_out_site == 0:
     pass  # production run; include all data                                                                                   
 else:
     test_n = X_test.size(0)
-    def check_results(total_b, I_test, check_xset, check_y1set, Y_stats):
+    def check_results(total_b, check_xset, check_y1set, Y_stats):
         Y_true_all=torch.zeros((check_y1set.shape[0], timesteps_per_year, check_y1set.shape[2]))
         Y_pred_all=torch.zeros((check_y1set.shape[0], timesteps_per_year, check_y1set.shape[2]))    
         for bb in range(int(total_b/1)):
@@ -718,8 +634,7 @@ else:
             hidden = model.init_hidden(ebb-sbb)
             X_input = check_xset[sbb:ebb, :, :].to(device)
             Y_true = check_y1set[sbb:ebb, :, :].to(device)
-            I_input = I_test[sbb:ebb, :, :].to(device)
-            Y1_pred_t, hidden = model(I_input, X_input,hidden)
+            Y1_pred_t, hidden = model(X_input,hidden)
 
             Y_true = Y_true[:,timesteps_per_year:(timesteps_per_year*2),:]  # chop off first year
             Y1_pred_t = Y1_pred_t[:,timesteps_per_year:(timesteps_per_year*2),:] 
@@ -736,12 +651,12 @@ else:
 
     with torch.no_grad():
         checkpoint=torch.load(finetune_path, map_location=torch.device('cpu'), weights_only=False)
-        model=gru_w_cnn(X_obs_windows[0].shape[-1],n_a,n_l,1,dropout)
+        model=gru(X_obs_windows[0].shape[-1],n_a,n_l,1,dropout)
         model.load_state_dict(checkpoint['model_state_dict'])
         model.to(device) #too large for GPU, kif not enough, change to cpu
         model.eval()  # this is "testing" model, it switches off dropout and batch norm.
         epoch = checkpoint['epoch']
-        Y_test_pred,R_test,loss_test =  check_results(test_n, I_test.float(), X_test.float(), Y_test, Y_stats)    
+        Y_test_pred,R_test,loss_test =  check_results(test_n, X_test.float(), Y_test, Y_stats)    
 
         # write
         with open(path_out, "w") as outfile:
