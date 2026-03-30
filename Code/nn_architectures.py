@@ -139,7 +139,7 @@ class domain_classifier(nn.Module):
         x = torch.sigmoid(x)
         return x
 
-class doman_adapt(nn.Module):
+class domain_adapt(nn.Module):
     def __init__(self, input_dim, hidden_dim, lambda_):
         super(domain_adapt, self).__init__()
         self.feature_extractor = feature_extractor(input_dim, hidden_dim)
