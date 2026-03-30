@@ -163,22 +163,6 @@ M_obs_windows = list(new_M)
 G_obs_windows = list(new_G)
 I_obs_windows = list(new_I)
 
-def split_data_group(data0,shuffled_ind,train_frac=0.7,val_frac=0.3):
-    sample_size = len(data0)
-    train_n=int(train_frac*sample_size)
-    val_n = sample_size-train_n
-    test_n=0
-    data_train, data_val = [],[]
-    for i in range(0, train_n):
-        data_train.append(data0[shuffled_ind[i]])
-    for i in range(train_n,sample_size):
-        data_val.append(data0[shuffled_ind[i]])
-    data_train = torch.cat(data_train, dim=0)
-    data_val = torch.cat(data_val, dim=0)
-    data_train = data_train.to(torch.float32)
-    data_val = data_val.to(torch.float32)
-    return data_train,data_val
-
 ### train/val/test split
 
 # separate single test site
@@ -205,19 +189,19 @@ del I_temp[test_ind]
 shuffled_ind = torch.randperm(len(X_temp))
 
 # X
-X_train, X_val = split_data_group(X_temp,shuffled_ind)
+X_train, X_val = utils.split_data_group(X_temp,shuffled_ind, train_frac=0.7,val_frac=0.3,test_frac=0.0)
 
 # Y
-Y_train, Y_val = split_data_group(Y_temp,shuffled_ind)
+Y_train, Y_val = utils.split_data_group(Y_temp,shuffled_ind, train_frac=0.7,val_frac=0.3,test_frac=0.0)
 
 # Z
-Z_train, Z_val = split_data_group(Z_temp,shuffled_ind)
+Z_train, Z_val = utils.split_data_group(Z_temp,shuffled_ind, train_frac=0.7,val_frac=0.3,test_frac=0.0)
 
 # M
-M_train, M_val = split_data_group(M_temp,shuffled_ind)
+M_train, M_val = utils.split_data_group(M_temp,shuffled_ind, train_frac=0.7,val_frac=0.3,test_frac=0.0)
 
 # I
-I_train, I_val = split_data_group(I_temp,shuffled_ind)
+I_train, I_val = utils.split_data_group(I_temp,shuffled_ind, train_frac=0.7,val_frac=0.3,test_frac=0.0)
 
 ### initialize params for training
 n_a=8 #hidden state number

@@ -283,40 +283,19 @@ X_sim_windows = list(new_X)
 Y_sim_windows = list(new_Y)
 Z_sim_windows = list(new_Z)
 
-### train/val/test split
-def utils.split_data_group(data0,shuffled_ind,train_frac=0.7,val_frac=0.3):
-    sample_size = len(data0)
-    train_n=int(train_frac*sample_size)
-    val_n=int(val_frac*sample_size)
-    test_n=sample_size - train_n -val_n
-    data_train, data_val, data_test = [],[],[]
-    for i in range(train_n):
-        data_train.append(data0[shuffled_ind[i]])
-    for i in range(train_n, train_n+val_n):
-        data_val.append(data0[shuffled_ind[i]])
-    for i in range(train_n+val_n, sample_size):
-        data_test.append(data0[shuffled_ind[i]])
-    data_train = torch.cat(data_train, dim=0)
-    data_val = torch.cat(data_val, dim=0)
-    data_test = torch.cat(data_test, dim=0)
-    data_train = data_train.to(torch.float32)
-    data_val = data_val.to(torch.float32)
-    data_test = data_test.to(torch.float32)
-    return data_train, data_val, data_test, 
-
 # shuffle remaining
 X_temp = deepcopy(X_sim_windows)
 Y_temp = deepcopy(Y_sim_windows)
 Z_temp = deepcopy(Z_sim_windows)
 shuffled_ind = torch.randperm(len(X_temp))
 # X
-X_train_sim, X_val_sim, X_test_sim = utils.split_data_group(X_temp,shuffled_ind)
+X_train_sim, X_val_sim, X_test_sim = utils.split_data_group(X_temp,shuffled_ind, train_frac=0.7,val_frac=0.3,test_frac=0.0)
 
 # Y
-Y_train_sim, Y_val_sim, Y_test_sim = split_data_group(Y_temp,shuffled_ind)
+Y_train_sim, Y_val_sim, Y_test_sim = utils.split_data_group(Y_temp,shuffled_ind, train_frac=0.7,val_frac=0.3,test_frac=0.0)
 
 # Z
-Z_train_sim, Z_val_sim, Z_test_sim = split_data_group(Z_temp,shuffled_ind)
+Z_train_sim, Z_val_sim, Z_test_sim = utils.split_data_group(Z_temp,shuffled_ind, train_frac=0.7,val_frac=0.3,test_frac=0.0)
 
 ### initialize params for training
 loss_val_best = 999999
@@ -520,23 +499,6 @@ for site in range(len(outputs)):
 ### Stack initial estimates onto second model ###
 #################################################
     
-def utils.split_data_group(data0,shuffled_ind,train_frac=0.7,val_frac=0.3):
-    sample_size = len(data0)
-    train_n=int(train_frac*sample_size)
-    # val_n=int(val_frac*sample_size)
-    # test_n=sample_size - train_n -val_n
-    val_n = sample_size-train_n
-    test_n=0
-    data_train, data_val = [],[]
-    for i in range(0, train_n):
-        data_train.append(data0[shuffled_ind[i]])
-    for i in range(train_n,sample_size):
-        data_val.append(data0[shuffled_ind[i]])
-    data_train = torch.cat(data_train, dim=0)
-    data_val = torch.cat(data_val, dim=0)
-    data_train = data_train.to(torch.float32)
-    data_val = data_val.to(torch.float32)
-
 ### train/val/test split
 # separate single test site
 if hold_out_site == 0:
@@ -569,19 +531,19 @@ else:
 shuffled_ind = torch.randperm(len(X_temp))
 
 # X
-X_train, X_val = utils.split_data_group(X_temp,shuffled_ind)
+X_train, X_val = utils.split_data_group(X_temp,shuffled_ind, train_frac=0.7,val_frac=0.3,test_frac=0.0)
 
 # Y
-Y_train, Y_val = utils.split_data_group(Y_temp,shuffled_ind)
+Y_train, Y_val = utils.split_data_group(Y_temp,shuffled_ind, train_frac=0.7,val_frac=0.3,test_frac=0.0)
 
 # Z
-Z_train, Z_val = utils.split_data_group(Z_temp,shuffled_ind)
+Z_train, Z_val = utils.split_data_group(Z_temp,shuffled_ind, train_frac=0.7,val_frac=0.3,test_frac=0.0)
 
 # M
-M_train, M_val = utils.split_data_group(M_temp,shuffled_ind)
+M_train, M_val = utils.split_data_group(M_temp,shuffled_ind, train_frac=0.7,val_frac=0.3,test_frac=0.0)
 
 # I
-I_train, I_val = utils.split_data_group(I_temp,shuffled_ind)
+I_train, I_val = utils.split_data_group(I_temp,shuffled_ind, train_frac=0.7,val_frac=0.3,test_frac=0.0)
 
 
 ### initialize params for training
