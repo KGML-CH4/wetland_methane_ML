@@ -99,7 +99,7 @@ obs[obs == -9999] = np.nan
 obs = obs * (100. / 72.2)
 X_obs[:,ind] = deepcopy(obs)
 
-### swap out site class for new classes                                                                                                 
+### swap out site class for new classes                                      
 wettypes = np.genfromtxt(config.fp_wetland_class,dtype='str')
 siteid_ind = list(X_vars_obs).index("SITE_ID")
 class_ind = list(X_vars_obs).index("SITE_CLASSIFICATION")

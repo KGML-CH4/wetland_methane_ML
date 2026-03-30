@@ -25,8 +25,8 @@ if hold_out_site == 0:
     finetune_path = config.fp_train + '/production_rep_' + str(rep) + '.sav'
 else:
     finetune_path = config.fp_train + '/finetune_' + config.model_version + "_" + str(hold_out_site) + "_rep_" + str(rep) + '.sav'
-    
-### params
+
+### params                                               
 start_year, end_year = config.start_year, config.end_year
 num_years=end_year-start_year+1
 timesteps_per_year=config.timesteps_per_year
@@ -40,7 +40,7 @@ bsz_obs = config.bsz_obs
 bsz_sim = config.bsz_sim
 patience=config.patience
 factor=config.factor
-maxepoch=config.maxepoch
+maxepoch=config.maxepoch    
 
 ############################
 ### PRETRAINING ############
@@ -58,33 +58,37 @@ Z_vars_obs = data0['Z_vars']
 X_stats = data0['X_stats']
 Y_stats = data0['Y_stats']
 I_stats = data0['I_stats']
-ids = np.arange(X_obs.shape[0])  # site ID: this notebook is splitting by site ID—no option for random split
+
+# site ID 
+ids = np.arange(X_obs.shape[0])  # this notebook is splitting by site ID—no option for random split
 
 ### Separate out F_CH4 (into variable "M")
-### create new var
+
+# create new var
 mind = list(X_vars_obs).index("FCH4")
 M_obs = deepcopy(X_obs[:,:,mind])
 M_vars_obs = deepcopy(X_vars_obs[mind])
 M_stats = deepcopy(X_stats[mind, :])
 
-### remove from X
+# remove from X
 X_obs = np.delete(X_obs, mind, axis=2)
 X_vars_obs = np.delete(X_vars_obs, mind)
 X_stats = np.delete(X_stats, mind, axis=0)
 
 ### Separate out FCH4_F_ANNOPTLM (into variable "G")
-### create new var
+
+# create new var
 gind = list(X_vars_obs).index("FCH4_F_ANNOPTLM")
 G_obs = X_obs[:,:,gind]
 G_vars_obs = X_vars_obs[gind]
 G_stats = deepcopy(X_stats[gind, :])
 
-### remove from X
+# remove from X
 X_obs = np.delete(X_obs, gind, axis=2)
 X_vars_obs = np.delete(X_vars_obs, gind)
 X_stats = np.delete(X_stats, gind, axis=0)
  
-### chunk up train sites into windows
+# chunk up train sites into windows
 new_X, new_Y, new_Z, new_M, new_G, new_I = [],[],[],[],[],[]
 num_sites = X_obs.shape[0]
 for site in range(num_sites):
@@ -136,6 +140,7 @@ for site in range(num_sites):
 
         # third check: do we have enough months with non-missing data in year 2?
         if torch.sum(y_missing_2) <= (timesteps_per_year-nonmissing_required):
+            #y_piece = torch.nan_to_num(y_piece, nan=-999)  # replace nan with -999 for the custom loss
             y_piece = np.expand_dims(y_piece, axis=-1)
             new_site_x.append(x_piece)
             new_site_y.append(y_piece)
@@ -173,10 +178,11 @@ Y_vars_sim = data0['Y_vars']
 Z_vars_sim = data0['Z_vars']
 X_stats_sim = data0['X_stats']
 Y_stats_sim = data0['Y_stats']
+
+# site ID 
 ids = np.arange(X_sim.shape[0])  # this notebook is splitting by site ID—no option for random split
 
-### filter eddy covariance sites from TEM
-### get obs grid cells
+# get obs grid cells
 bad_cells = {}
 num_sites = X_obs.shape[0]
 for site in range(num_sites):
@@ -191,7 +197,7 @@ for site in range(num_sites):
     else:
         bad_cells[coords] = 0
 
-### loop through TEM sites and make sure they don't overlap with flux towers
+# loop through TEM sites and make sure they don't overlap with flux towers
 new_X = []
 new_Y = []
 new_Z = []
@@ -218,7 +224,8 @@ Y_sim = torch.tensor(np.array(new_Y))
 Z_sim = torch.tensor(np.array(new_Z))
 
 ### prep and filter time windows
-### chunk up train sites into windows
+ 
+# chunk up train sites into windows
 windowed_indices_sim = {}
 new_X, new_Y, new_Z = [],[],[]
 num_sites = X_sim.shape[0]
@@ -243,13 +250,13 @@ for site in range(num_sites):
         for month in range(timesteps_per_year):  # timesteps 1-12
             if x_missing_1[month] == True: # if any is missing, replace all with missing
                 x_piece[month, :] = -9999  # note this is the "full" x_piece that gets passed through
-              
+                
         # (skipping filter on missing data in year-1, i.e., it can be all missing)
-              
+                
         # year 2
         x_piece_2 = x_piece[timesteps_per_year:(timesteps_per_year*2), :]
         y_piece_2 = y_piece[timesteps_per_year:(timesteps_per_year*2)]
-      
+        
         # second check: do positions of missing x values == missing y value positions?
         # We cannot expect the model to output a good estimate for, say, January, if there are no inputs.
         # But the reciprocal: we should keep the inputs even if no output, because that's more information for the RNN to work with.
@@ -264,7 +271,7 @@ for site in range(num_sites):
         # 
         x_missing_2 = (x_piece_2 == -9999).any(dim=1)  # re-counting after adding nans
         y_missing_2 = (y_piece_2 == -9999)  
-      
+        
         # third check: do we have enough months with non-missing data in year 2?
         if torch.sum(y_missing_2) <= (timesteps_per_year-nonmissing_required):
             y_piece = np.expand_dims(y_piece, axis=-1)
@@ -278,16 +285,19 @@ for site in range(num_sites):
         new_X.append(torch.tensor(np.array(new_site_x)))
         new_Y.append(torch.tensor(np.array(new_site_y)))
         new_Z.append(torch.tensor(np.array(new_site_z)))
-#
+
 X_sim_windows = list(new_X)
 Y_sim_windows = list(new_Y)
 Z_sim_windows = list(new_Z)
+
+### train/val/test split
 
 # shuffle remaining
 X_temp = deepcopy(X_sim_windows)
 Y_temp = deepcopy(Y_sim_windows)
 Z_temp = deepcopy(Z_sim_windows)
 shuffled_ind = torch.randperm(len(X_temp))
+
 # X
 X_train_sim, X_val_sim, X_test_sim = utils.split_data_group(X_temp,shuffled_ind, train_frac=0.7,val_frac=0.3,test_frac=0.0)
 
@@ -298,8 +308,12 @@ Y_train_sim, Y_val_sim, Y_test_sim = utils.split_data_group(Y_temp,shuffled_ind,
 Z_train_sim, Z_val_sim, Z_test_sim = utils.split_data_group(Z_temp,shuffled_ind, train_frac=0.7,val_frac=0.3,test_frac=0.0)
 
 ### initialize params for training
-loss_val_best = 999999
-best_epoch = 9999
+n_a=8 #hidden state number
+n_l=2 #layer of gru
+loss_val_best = 500000
+best_epoch = 1000
+lr_adam=0.001 #orginal 0.0001
+bsz = 1000
 train_losses = []
 val_losses = []
 
@@ -312,9 +326,7 @@ params = list(model.parameters())
     
 # optimizer
 optimizer = optim.Adam(model.parameters(), lr=lr_adam) #add weight decay normally 1-9e-4
-
-# scheduler
-scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=patience, factor=factor)
+scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=10, factor=0.5)
 maxepoch=100
 
 def load_tile(epoch):
@@ -364,7 +376,7 @@ def load_tile(epoch):
     
     return I_train_sim, I_val_sim
 
-### train
+### pretrain
 train_n = X_train_sim.size(0)
 val_n = X_val_sim.size(0)
 test_n = X_test_sim.size(0)
@@ -386,24 +398,21 @@ for epoch in range(maxepoch):
     # forward
     model.train()  # (switch on dropout; and optimization?)
     model.zero_grad()
-    for bb in range(int(train_n/bsz_sim)):
-        if bb != int(train_n/bsz_sim)-1:
-            sbb = bb*bsz_sim
-            ebb = (bb+1)*bsz_sim
+    for bb in range(int(train_n/bsz)):
+        if bb != int(train_n/bsz)-1:
+            sbb = bb*bsz
+            ebb = (bb+1)*bsz
         else:
-            sbb = bb*bsz_sim
+            sbb = bb*bsz
             ebb = train_n
         hidden = model.init_hidden(ebb-sbb).to(device)
         optimizer.zero_grad()
         X_input = X_train_shuff[sbb:ebb, :, :].to(device)
         Y_true = Y_train_shuff[sbb:ebb, :, :].to(device)
         I_input = I_train_shuff[sbb:ebb].to(device)
-
         Y_est, _ = model(I_input, X_input, hidden)
-
         Y_est = Y_est[:,timesteps_per_year:(timesteps_per_year*2),:]  # chopping off the first year, that was spin-up
         Y_true = Y_true[:,timesteps_per_year:(timesteps_per_year*2),:]
-
         
         loss = mse_missing(Y_est, Y_true)
         hidden.detach_()
@@ -411,6 +420,7 @@ for epoch in range(maxepoch):
         optimizer.step()
         with torch.no_grad():
             train_loss += loss.item() * (ebb-sbb)  # (NOT "bsz", since some batches aren't full)
+    #
     
     # validation
     model.eval()  # "testing" model, it switches off dropout and batch norm.    
@@ -434,7 +444,7 @@ for epoch in range(maxepoch):
         scheduler.step(val_loss)
         for param_group in optimizer.param_groups:
             print(f"Learning rate after epoch {epoch+1}: {param_group['lr']}")
-                    
+        
         # save model, update LR
         if val_loss < loss_val_best:
             loss_val_best=np.array(val_loss)
@@ -445,73 +455,34 @@ for epoch in range(maxepoch):
                     'los_val': val_loss,
                     }, pretrain_path)   
         print("finished training epoch", epoch+1, flush=True)
-        print("learning rate: ", optimizer.param_groups[0]["lr"], "train_loss: ", train_loss, "val_loss:",val_loss, "best_val_loss:",loss_val_best, flush=True)
+	print("learning rate: ", optimizer.param_groups[0]["lr"], "train_loss: ", train_loss, "val_loss:",val_loss, "best_val_loss:",loss_val_best, flush=True)
         path_fs = pretrain_path+'fs'
         torch.save({'train_losses': train_losses,
                     'val_losses': val_losses,
                     'model_state_dict_fs': model.state_dict(),
                     }, path_fs)  
-#
 
 print("final train_loss:",train_loss,"val_loss:",val_loss,"val loss best:",loss_val_best, flush=True)
-
 del I_train_sim, I_val_sim
 gc.collect()
 
-### forward pass to get TEM predictions
-def check_results(total_b, check_xset, check_y1set, I_input):
-    hidden = model.init_hidden(total_b)
-    X_input = check_xset.to(device).float()
-    Y_true = check_y1set.to(device)
-    I_input = I_input.to(device).float()
-    Y1_pred_t, _ = model(I_input, X_input, hidden)            
-    return Y1_pred_t
 
-outputs = []
-with torch.no_grad():
-    for test_ind in range(len(X_obs_windows)):
-        X_test = X_obs_windows[test_ind]
-        Y_test = Y_obs_windows[test_ind]
-        I_test = I_obs_windows[test_ind]
-        test_n = len(X_test)
-        checkpoint=torch.load(pretrain_path, map_location=torch.device('cpu'), weights_only=False)
-        model=gru_w_cnn(6,n_a,n_l,1,dropout)
-        model.load_state_dict(checkpoint['model_state_dict'])
-        model.to(device) #too large for GPU, kif not enough, change to cpu
-        model.eval()  # this is "testing" model, it switches off dropout and batch norm.
-        epoch = checkpoint['epoch']
-        print("epoch", epoch, flush=True)
-        Y_test_pred =  check_results(test_n, X_test, Y_test, I_test)    
-        outputs.append(Y_test_pred)
 
-### process TEM predictions
-for site in range(len(outputs)):
+#################
+### Fine tune ###
+#################
 
-    # assign missing data where Y is missing (consistent with the other predictors in this model)
-    missing = np.where(Y_obs_windows[site] == -9999)
-    outputs[site][missing] = -9999
-
-    # shove into X
-    new_data = torch.cat([X_obs_windows[site], outputs[site]], dim=-1)
-    X_obs_windows[site] = deepcopy(new_data)
-
-#################################################
-### Stack initial estimates onto second model ###
-#################################################
-    
 ### train/val/test split
+
 # separate single test site
-if hold_out_site == 0:
-    pass  # production run; include all data
-else:
-    X_test = X_obs_windows[hold_out_site]
-    Y_test = Y_obs_windows[hold_out_site]
-    Z_test = Z_obs_windows[hold_out_site]
-    M_test = M_obs_windows[hold_out_site]
-    I_test = I_obs_windows[hold_out_site]
-    if len(X_test) == 0:
-        print("\n\n\n\t test data empty\n\n\n")
-        sys.exit()
+X_test = X_obs_windows[test_ind]
+Y_test = Y_obs_windows[test_ind]
+Z_test = Z_obs_windows[test_ind]
+M_test = M_obs_windows[test_ind]
+I_test = I_obs_windows[test_ind]
+if len(X_test) == 0:
+    print("\n\n\n\t test data empty\n\n\n")
+    sys.exit()
 
 # shuffle remaining
 X_temp = deepcopy(X_obs_windows)
@@ -519,15 +490,11 @@ Y_temp = deepcopy(Y_obs_windows)
 Z_temp = deepcopy(Z_obs_windows)
 M_temp = deepcopy(M_obs_windows)
 I_temp = deepcopy(I_obs_windows)
-if hold_out_site == 0:
-    pass  # production run; include all data                                                                                    
-else:
-    del X_temp[hold_out_site]
-    del Y_temp[hold_out_site]
-    del Z_temp[hold_out_site]
-    del M_temp[hold_out_site]
-    del I_temp[hold_out_site]
-#
+del X_temp[test_ind]
+del Y_temp[test_ind]
+del Z_temp[test_ind]
+del M_temp[test_ind]
+del I_temp[test_ind]
 shuffled_ind = torch.randperm(len(X_temp))
 
 # X
@@ -545,26 +512,31 @@ M_train, M_val = utils.split_data_group(M_temp,shuffled_ind, train_frac=0.7,val_
 # I
 I_train, I_val = utils.split_data_group(I_temp,shuffled_ind, train_frac=0.7,val_frac=0.3,test_frac=0.0)
 
-
 ### initialize params for training
-loss_val_best = 999999
-best_epoch = 9999
+n_a=8 #hidden state number
+n_l=2 #layer of gru
+loss_val_best = 500000
+best_epoch = 1000
+lr_adam=0.001 #orginal 0.0001
+bsz = 10
 train_losses = []
 val_losses = []
 
 ### load pre-trained model 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-print('Using device:', device, flush=True)
-
 dropout = 0
-model = gru_w_cnn(X_obs_windows[0].shape[-1],n_a,n_l,1,dropout)
-model.to(device) #too large for GPU, kif not enough, change to cpu
+
+with torch.no_grad():
+    checkpoint=torch.load(pretrain_path, map_location=device, weights_only=False)   
+    model = gru_w_cnn(len(X_vars_obs),n_a,n_l,1,dropout)
+    model.load_state_dict(checkpoint['model_state_dict'])
+    model.to(device) #too large for GPU, kif not enough, change to cpu
 
 params = list(model.parameters())
 
 # optimizer
 optimizer = optim.Adam(model.parameters(), lr=lr_adam) #add weight decay normally 1-9e-4
-scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=patience, factor=factor)
+scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=10, factor=0.5)
 maxepoch=100
 
 ### finetune
@@ -586,12 +558,12 @@ for epoch in range(maxepoch):
     # forward
     model.train()  # (switch on dropout; and optimization?)
     model.zero_grad()
-    for bb in range(int(train_n/bsz_obs)):
-        if bb != int(train_n/bsz_obs)-1:
-            sbb = bb*bsz_obs
-            ebb = (bb+1)*bsz_obs
+    for bb in range(int(train_n/bsz)):
+        if bb != int(train_n/bsz)-1:
+            sbb = bb*bsz
+            ebb = (bb+1)*bsz
         else:
-            sbb = bb*bsz_obs
+            sbb = bb*bsz
             ebb = train_n
         hidden = model.init_hidden(ebb-sbb).to(device)
         optimizer.zero_grad()
@@ -602,20 +574,21 @@ for epoch in range(maxepoch):
         # augment images
         B, T, C, H, W = I_input.shape
         I_input = I_input.view(B * T, C, H, W)
-        I_input = torch.stack([utils.random_flip_rotate(img) for img in I_input])
+        I_input = torch.stack([random_flip_rotate(img) for img in I_input])
         I_input = I_input.view(B, T, C, H, W)
         
         Y_est, _ = model(I_input, X_input, hidden)
+
         Y_est = Y_est[:,timesteps_per_year:(timesteps_per_year*2),:]  # chopping off the first year, that was spin-up
         Y_true = Y_true[:,timesteps_per_year:(timesteps_per_year*2),:]
         
         loss = mse_missing(Y_est, Y_true)
+
         hidden.detach_()
         loss.backward()
         optimizer.step()
         with torch.no_grad():
             train_loss += loss.item() * (ebb-sbb)  # (NOT "bsz", since some batches aren't full)
-    #
     
     # validation
     model.eval()  # "testing" model, it switches off dropout and batch norm.    
@@ -637,8 +610,6 @@ for epoch in range(maxepoch):
         val_losses.append(val_loss)
 
         scheduler.step(val_loss)
-        for param_group in optimizer.param_groups:
-            print(f"Learning rate after epoch {epoch+1}: {param_group['lr']}")
         
         # save model, update LR
         if val_loss < loss_val_best:
@@ -650,64 +621,59 @@ for epoch in range(maxepoch):
                     'los_val': val_loss,
                     }, finetune_path)   
         print("finished training epoch", epoch+1, flush=True)
-        print("learning rate: ", optimizer.param_groups[0]["lr"], "train_loss: ", train_loss, "val_loss:",val_loss, "best_val_loss:",loss_val_best, flush=True)
+	print("learning rate: ", optimizer.param_groups[0]["lr"], "train_loss: ", train_loss, "val_loss:",val_loss, "best_val_loss:",loss_val_best, flush=True)
         path_fs = finetune_path+'fs'
         torch.save({'train_losses': train_losses,
                     'val_losses': val_losses,
                     'model_state_dict_fs': model.state_dict(),
                     }, path_fs)  
 #
-
 print("final train_loss:",train_loss,"val_loss:",val_loss,"val loss best:",loss_val_best, flush=True)
 
-
-
 ### test
-if hold_out_site == 0:
-    pass  # production run; include all data                                                                                   
-else:
-    test_n = X_test.size(0)
-    def check_results(total_b, I_test, check_xset, check_y1set, Y_stats):
-        Y_true_all=torch.zeros((check_y1set.shape[0], timesteps_per_year, check_y1set.shape[2]))
-        Y_pred_all=torch.zeros((check_y1set.shape[0], timesteps_per_year, check_y1set.shape[2]))    
-        for bb in range(int(total_b/1)):
-            if bb != int(total_b/1)-1:
-                sbb = bb*1
-                ebb = (bb+1)*1
-            else:
-                sbb = bb*1
-                ebb = total_b
-            hidden = model.init_hidden(ebb-sbb)
-            X_input = check_xset[sbb:ebb, :, :].to(device)
-            Y_true = check_y1set[sbb:ebb, :, :].to(device)
-            I_input = I_test[sbb:ebb, :, :].to(device)
-            Y1_pred_t, hidden = model(I_input, X_input,hidden)
+test_n = X_test.size(0)
+def check_results(total_b, I_test, check_xset, check_y1set, Y_stats):
+    Y_true_all=torch.zeros((check_y1set.shape[0], timesteps_per_year, check_y1set.shape[2]))
+    Y_pred_all=torch.zeros((check_y1set.shape[0], timesteps_per_year, check_y1set.shape[2]))    
+    for bb in range(int(total_b/1)):
+        if bb != int(total_b/1)-1:
+            sbb = bb*1
+            ebb = (bb+1)*1
+        else:
+            sbb = bb*1
+            ebb = total_b
+        hidden = model.init_hidden(ebb-sbb)
+        X_input = check_xset[sbb:ebb, :, :].to(device)
+        Y_true = check_y1set[sbb:ebb, :, :].to(device)
+        I_input = I_test[sbb:ebb, :, :].to(device)
+        Y1_pred_t, hidden = model(I_input, X_input,hidden)
 
-            Y_true = Y_true[:,timesteps_per_year:(timesteps_per_year*2),:]  # chop off first year
-            Y1_pred_t = Y1_pred_t[:,timesteps_per_year:(timesteps_per_year*2),:] 
+        Y_true = Y_true[:,timesteps_per_year:(timesteps_per_year*2),:]  # chop off first year
+        Y1_pred_t = Y1_pred_t[:,timesteps_per_year:(timesteps_per_year*2),:] 
+        
+        #            
+        Y_true_all[sbb:ebb, :, :] = Y_true.to('cpu')  
+        Y_pred_all[sbb:ebb, :, :] = Y1_pred_t.to('cpu')  
+    #
+    loss = []    
+    for varn in range(check_y1set.size(2)):
+        loss.append(mse_missing(Y_pred_all[:,:,varn], Y_true_all[:,:,varn]).numpy())
 
-            #            
-            Y_true_all[sbb:ebb, :, :] = Y_true.to('cpu')  
-            Y_pred_all[sbb:ebb, :, :] = Y1_pred_t.to('cpu')  
-        #
-        loss = []    
-        for varn in range(check_y1set.size(2)):
-            loss.append(mse_missing(Y_pred_all[:,:,varn], Y_true_all[:,:,varn]).numpy())
-        return Y_pred_all, loss
+    return Y_pred_all, loss
 
 
-    with torch.no_grad():
-        checkpoint=torch.load(finetune_path, map_location=torch.device('cpu'), weights_only=False)
-        model=gru_w_cnn(X_obs_windows[0].shape[-1],n_a,n_l,1,dropout)
-        model.load_state_dict(checkpoint['model_state_dict'])
-        model.to(device) #too large for GPU, kif not enough, change to cpu
-        model.eval()  # this is "testing" model, it switches off dropout and batch norm.
-        epoch = checkpoint['epoch']
-        Y_test_pred,R_test,loss_test =  check_results(test_n, I_test.float(), X_test.float(), Y_test, Y_stats)    
+with torch.no_grad():
+    checkpoint=torch.load(finetune_path, map_location=torch.device('cpu'), weights_only=False)
+    model=gru_w_cnn(len(X_vars_obs),n_a,n_l,1,dropout)
+    model.load_state_dict(checkpoint['model_state_dict'])
+    model.to(device) #too large for GPU, kif not enough, change to cpu
+    model.eval()  # this is "testing" model, it switches off dropout and batch norm.
+    epoch = checkpoint['epoch']
+    Y_test_pred,R_test,loss_test =  check_results(test_n, I_test.float(), X_test.float(), Y_test, Y_stats)    
 
-        # write
-        with open(path_out, "w") as outfile:
-            for window in range(Y_test_pred.shape[0]):
-                outline = list(Y_test_pred[window,:,0].numpy())
-                outline = "\t".join(list(map(str, outline)))
-                outfile.write(outline + "\n")
+    # write
+    with open(path_out, "w") as outfile:
+        for window in range(Y_test_pred.shape[0]):
+            outline = list(Y_test_pred[window,:,0].numpy())
+            outline = "\t".join(list(map(str, outline)))
+            outfile.write(outline + "\n")

@@ -1,7 +1,3 @@
-// model-stacking plus CNN
-
-
-
 params.each { k, v -> 
     println "- $k = $v"
 }
@@ -9,7 +5,7 @@ println "=============================\n"
 
 workflow {
     // preprocess FLUXNET
-    prep_fluxnet = Preprocess_FLUXNET(modis_prepped)
+    prep_fluxnet = Preprocess_FLUXNET()
 
     // download MODIS images at fluxnet sites
     modis_fluxnet = Download_MODIS_fluxnet(prep_fluxnet)
@@ -32,7 +28,7 @@ workflow {
     prep_modis = prep_modis.collect()
     modis_prepped = Prep_MODIS_global_4(prep_modis)
 
-    // preprocess specific to model-stacking plus CNN
+    // preprocess specific to model
     prep_model = Preprocess_model(modis_fluxnet, prep_tem, modis_prepped)
 
     // train
@@ -254,7 +250,7 @@ process Preprocess_model() {
 
     script:
     """
-    python ${params.repo}/Code/Model_stacking_CNN/preprocess.py
+    python ${params.repo}/Code/preprocess_ml_cnn.py
     """
 }
 
@@ -278,7 +274,7 @@ process Train {
 
     script:
     """
-    python ${params.repo}/Code/Model_stacking_CNN/train.py \
+    python ${params.repo}/Code/${params.repo}/train.py \
         ${test_index} \
         ${rep}
     """
@@ -300,9 +296,8 @@ process Eval {
     path "evaluation.pdf"
     
     script:
-    """                                                                                                                            
-    python ${params.repo}/Code/evaluate.py \
-        "Cross domain model stacking"                                                                                                            
+    """
+    python ${params.repo}/Code/evaluate.py
     """
 }
 
@@ -323,7 +318,7 @@ process Preprocess_upscale_WAD2M {
 
     script:
     """
-    python ${params.repo}/Code/Model_stacking_CNN/preprocess_upscale_WAD2M.py
+    python ${params.repo}/Code/${params.repo}/preprocess_upscale_WAD2M.py
     """
 }
 
@@ -347,7 +342,7 @@ process Upscale_train_WAD2M {
 
     script:
     """
-    python ${params.repo}/Code/Model_stacking_CNN/train.py \
+    python ${params.repo}/Code/${params.repo}/train.py \
         0 \
         ${rep}
     """
@@ -373,7 +368,7 @@ process Upscale_WAD2M {
 
     script:
     """
-    python ${params.repo}/Code/Model_stacking_CNN/upscale_WAD2M.py ${rep}
+    python ${params.repo}/Code/${params.repo}/upscale_WAD2M.py ${rep}
     echo "Done." > upscale_wad2m_${rep}.txt
     """
 }
@@ -395,6 +390,6 @@ process Global_plot_WAD2m {
 
     script:
     """
-    python ${params.repo}/Code/Model_stacking_CNN/plot.py
+    python ${params.repo}/Code/${params.repo}/plot.py
     """
 }
