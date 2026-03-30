@@ -18,7 +18,7 @@ import nn_architectures
 hold_out_site = int(sys.argv[1])
 rep = int(sys.argv[2])
 
-### file paths                       
+### file paths
 path_out = config.fp_train + '/result_' + str(hold_out_site) + "_rep_" + str(rep) + '.txt'
 pretrain_path = config.fp_train + '/pretrain_' + config.model_version + "_" + str(hold_out_site) + "_rep_" + str(rep) + '.sav'
 if hold_out_site == 0:
@@ -40,9 +40,13 @@ bsz_obs = config.bsz_obs
 bsz_sim = config.bsz_sim
 patience=config.patience
 factor=config.factor
-maxepoch=config.maxepoch
+maxepoch=config.maxepoch    
 
-### load observed data
+############################
+### PRETRAINING ############
+############################
+
+### load observed data first (b/c want to filter these sites from TEM training)
 data0 = torch.load(config.fp_prep_fluxnet, weights_only=False)
 X_obs = data0['X']
 Y_obs = data0['Y']
@@ -57,36 +61,6 @@ I_stats = data0['I_stats']
 
 # site ID 
 ids = np.arange(X_obs.shape[0])  # this notebook is splitting by site ID—no option for random split
-
-### unnormalize
-
-# swap -9999 for nan
-Y_obs[Y_obs == -9999] = np.nan
-X_obs[X_obs == -9999] = np.nan
-I_obs[I_obs == -9999] = np.nan
-
-# un-norm
-Y_obs[:,:,0] = Z_norm_reverse(Y_obs[:,:,0], Y_stats[0,:])
-for v in range(len(X_vars_obs)):
-    X_obs[:,:,v] = Z_norm_reverse(X_obs[:,:,v], X_stats[v,:])
-
-for v in range(7):
-   I_obs[:,:,v,:,:] = (I_obs[:,:,v,:,:]*I_stats[v,1]) + I_stats[v,0]
-
-# change nan back to -9999
-Y_obs = np.nan_to_num(Y_obs, nan=-9999)
-X_obs = np.nan_to_num(X_obs, nan=-9999)
-
-### go ahead and normalize the modis images using the global mean and sd 
-means = np.load(config.fp_modis_tiles + "/global_means.npy")
-sds = np.load(config.fp_modis_tiles + "/global_SDs.npy")
-
-means = means.reshape(1, 1, 7, 1, 1)
-I_obs -= means
-sds = sds.reshape(1, 1, 7, 1, 1)
-I_obs /= sds
-I_obs = np.nan_to_num(I_obs, nan=-9999)
-
 
 ### Separate out F_CH4 (into variable "M")
 
@@ -113,15 +87,7 @@ G_stats = deepcopy(X_stats[gind, :])
 X_obs = np.delete(X_obs, gind, axis=2)
 X_vars_obs = np.delete(X_vars_obs, gind)
 X_stats = np.delete(X_stats, gind, axis=0)
-
-### prep and filter time windows
-X_obs = torch.tensor(X_obs)
-Y_obs = torch.tensor(Y_obs)
-Z_obs = torch.tensor(Z_obs)
-M_obs = torch.tensor(M_obs)
-G_obs = torch.tensor(G_obs)
-I_obs = torch.tensor(I_obs)
-
+ 
 # chunk up train sites into windows
 new_X, new_Y, new_Z, new_M, new_G, new_I = [],[],[],[],[],[]
 num_sites = X_obs.shape[0]
@@ -174,6 +140,7 @@ for site in range(num_sites):
 
         # third check: do we have enough months with non-missing data in year 2?
         if torch.sum(y_missing_2) <= (timesteps_per_year-nonmissing_required):
+            #y_piece = torch.nan_to_num(y_piece, nan=-999)  # replace nan with -999 for the custom loss
             y_piece = np.expand_dims(y_piece, axis=-1)
             new_site_x.append(x_piece)
             new_site_y.append(y_piece)
@@ -214,23 +181,6 @@ Y_stats_sim = data0['Y_stats']
 
 # site ID 
 ids = np.arange(X_sim.shape[0])  # this notebook is splitting by site ID—no option for random split
-
-### unnormalize
-
-# swap -9999 for nan
-Y_sim[Y_sim == -9999] = np.nan
-X_sim[X_sim == -9999] = np.nan
-
-# un-norm
-Y_sim[:,:,0] = Z_norm_reverse(Y_sim[:,:,0], Y_stats_sim[0,:])
-for v in range(len(X_vars_sim)):
-    X_sim[:,:,v] = Z_norm_reverse(X_sim[:,:,v], X_stats_sim[v,:])
-
-# change nan back to -9999
-Y_sim = np.nan_to_num(Y_sim, nan=-9999)
-X_sim = np.nan_to_num(X_sim, nan=-9999)
-
-### filter eddy covariance sites from TEM
 
 # get obs grid cells
 bad_cells = {}
@@ -340,220 +290,6 @@ X_sim_windows = list(new_X)
 Y_sim_windows = list(new_Y)
 Z_sim_windows = list(new_Z)
 
-### Here, we do some shenanigans to normalize the real and sim data together
-
-# add indicator to real data
-X_temp_obs = []
-Y_temp_obs = []
-X_vars = np.append(X_vars_obs, "indicator")
-for i in range(len(X_obs_windows)):
-    site_temp = deepcopy(X_obs_windows[i])
-    site_temp[site_temp == -9999] = np.nan
-    indicator = np.ones((site_temp.shape[0], site_temp.shape[1], 1))  # make indicator variable full of 1's
-    nan_inds = np.where(np.isnan(site_temp[:,:,0]))  # see where other vars are missing (can look at just index 0, since all matching within windows)
-    indicator[nan_inds] = np.nan  # assign missing to the indicator var
-    site_temp = np.append(site_temp, indicator, axis=-1)  # append indicator to the other vars
-    X_temp_obs.append(site_temp)  # append modified site to X
-    site_temp = deepcopy(Y_obs_windows[i])  # here, in Y, we replace -9999 with nan
-    site_temp[site_temp == -9999] = np.nan
-    Y_temp_obs.append(site_temp)
-#
-X_temp_obs = np.concatenate(X_temp_obs, axis=0)
-Y_temp_obs = np.concatenate(Y_temp_obs, axis=0)
-
-# add indicator to TEM data
-X_temp_sim = []
-Y_temp_sim = []
-for i in range(len(X_sim_windows)):
-    if len(X_sim_windows[i]) > 0:
-        site_temp = deepcopy(X_sim_windows[i])
-        site_temp[site_temp == -9999] = np.nan
-        indicator = np.zeros((site_temp.shape[0], site_temp.shape[1], 1))  # zeros
-        nan_inds = np.where(np.isnan(site_temp[:,:,0]))
-        indicator[nan_inds] = np.nan
-        site_temp = np.append(site_temp, indicator, axis=-1)
-        X_temp_sim.append(site_temp)
-        site_temp = deepcopy(Y_sim_windows[i])
-        site_temp[site_temp == -9999] = np.nan
-        Y_temp_sim.append(site_temp)
-#
-X_temp_sim = np.concatenate(X_temp_sim, axis=0)
-Y_temp_sim = np.concatenate(Y_temp_sim, axis=0)
-
-### extra settings
-obs_per_batch = 5
-sims_per_batch = 5
-prop_loss_obs = 0.9  # fraction of the loss I want to reflect obs
-prop_loss_sim = 1-prop_loss_obs
-w_obs = prop_loss_obs / obs_per_batch
-w_sim = prop_loss_sim / sims_per_batch
-bsz = obs_per_batch + sims_per_batch
-obs_n = X_temp_obs.shape[0]
-total_batches = int(np.ceil(obs_n/obs_per_batch))
-sims_n = total_batches * sims_per_batch
-
-### here I want to use a monte carlo approach to obtain the mean and sd I will use for normalization
-
-# simulate random draws, calculate weighted mean and sd each iteration
-its = 10000  # num draws to simulate
-combined_X_stats = []
-combined_Y_stats = []
-for i in range(its):
-    if i % 1000 == 0:
-        print(i)
-    ## Y first
-    # draw random subset of sims
-    rand_inds = torch.randperm(len(X_temp_sim))[0:sims_n].numpy()
-    sim_draw = Y_temp_sim[rand_inds].flatten()
-
-    # apply weights
-    sim_weighted = sim_draw * w_sim
-    obs_weighted = Y_temp_obs.flatten() * w_obs 
-
-    # get missing mask
-    sim_mask = ~np.isnan(sim_draw)
-    obs_mask = ~np.isnan(Y_temp_obs)    
-
-    # calc weighted mean
-    weighted_sum = np.sum(sim_draw[sim_mask] * w_sim) + np.sum(Y_temp_obs[obs_mask] * w_obs)
-    valid_weight_sum = (np.sum(sim_mask) * w_sim) + (np.sum(obs_mask) * w_obs)
-    weighted_mean = weighted_sum / valid_weight_sum
-    
-    # calc weighted sd
-    weighted_sum = np.sum(((sim_draw[sim_mask]-weighted_mean)**2) * w_sim) + np.sum(((Y_temp_obs[obs_mask]-weighted_mean)**2) * w_obs)
-    weighted_sd = (weighted_sum / valid_weight_sum)**(1/2)
-
-    # add to list
-    combined_Y_stats.append( np.array([weighted_mean, weighted_sd]) )
-
-    ## now X
-    # draw random subset of sims
-    sim_draw = X_temp_sim[rand_inds]
-
-    # apply weights
-    sim_weighted = sim_draw * w_sim
-    obs_weighted = X_temp_obs * w_obs 
-
-    # loop through each predictor
-    x_stats = np.zeros((num_input_vars, 2))
-    for v in range(num_input_vars):
-        sim_var = sim_draw[:,:,v].flatten()
-        obs_var = X_temp_obs[:,:,v].flatten()
-        
-        # get missing mask
-        sim_mask = ~np.isnan(sim_var)
-        obs_mask = ~np.isnan(obs_var)    
-    
-        # calc weighted mean
-        weighted_sum = np.sum(sim_var[sim_mask] * w_sim) + np.sum(obs_var[obs_mask] * w_obs)
-        valid_weight_sum = (np.sum(sim_mask) * w_sim) + (np.sum(obs_mask) * w_obs)
-        weighted_mean = weighted_sum / valid_weight_sum
-        
-        # calc weighted sd
-        weighted_sum = np.sum(((sim_var[sim_mask]-weighted_mean)**2) * w_sim) + np.sum(((obs_var[obs_mask]-weighted_mean)**2) * w_obs)
-        weighted_sd = (weighted_sum / valid_weight_sum)**(1/2)
-
-        # add to list
-        x_stats[v,:] = np.array([weighted_mean, weighted_sd])
-    #    
-    combined_X_stats.append(x_stats)
-
-# unpack
-combined_X_stats = np.array(combined_X_stats)
-combined_Y_stats = np.array(combined_Y_stats)
-final_mean_Y = np.mean(combined_Y_stats[:,0])
-final_sd_Y = np.mean(combined_Y_stats[:,1])
-final_mean_X = np.mean(combined_X_stats[:,:,0], axis=0)
-final_sd_X = np.mean(combined_X_stats[:,:,1], axis=0)
-
-### normalize obs
-for ind in range(len(X_obs_windows)):
-    if len(X_obs_windows[ind]) > 0:
-        site_temp = deepcopy(X_obs_windows[ind])
-        site_temp[site_temp == -9999] = np.nan
-        indicator = np.ones((site_temp.shape[0], site_temp.shape[1], 1))  # ones
-        nan_inds = np.where(np.isnan(site_temp[:,:,0]))
-        indicator[nan_inds] = np.nan
-        site_temp = np.append(site_temp, indicator, axis=-1)
-        for v in range(num_input_vars):
-            site_temp[:,:,v] = (site_temp[:,:,v] - final_mean_X[v]) / final_sd_X[v]
-        site_temp = np.nan_to_num(site_temp, nan=-9999) 
-        X_obs_windows[ind] = torch.tensor(site_temp)
-        
-        site_temp = deepcopy(Y_obs_windows[ind])
-        site_temp[site_temp == -9999] = np.nan
-        site_temp[:,:,0] = (site_temp[:,:,0] - final_mean_Y) / final_sd_Y
-        site_temp = np.nan_to_num(site_temp, nan=-9999) 
-        Y_obs_windows[ind] = torch.tensor(site_temp)
-
-### train/val/test split
-def split_data_group(data0,shuffled_ind,train_frac=0.7,val_frac=0.3):
-    sample_size = len(data0)
-    train_n=int(train_frac*sample_size)
-    # val_n=int(val_frac*sample_size)
-    # test_n=sample_size - train_n -val_n
-    val_n = sample_size-train_n
-    test_n=0
-    data_train, data_val = [],[]
-    for i in range(train_n):
-        data_train.append(data0[shuffled_ind[i]])
-    for i in range(train_n,sample_size):
-        data_val.append(data0[shuffled_ind[i]])
-    data_train = torch.cat(data_train, dim=0)
-    data_val = torch.cat(data_val, dim=0)
-    data_train = data_train.to(torch.float32)
-    data_val = data_val.to(torch.float32)
-    return data_train,data_val
-
-# separate single test site
-X_test = deepcopy(X_obs_windows[test_ind]).to(torch.float32)
-Y_test = deepcopy(Y_obs_windows[test_ind]).to(torch.float32)
-Z_test = deepcopy(Z_obs_windows[test_ind]).to(torch.float32)
-I_test = deepcopy(I_obs_windows[test_ind]).to(torch.float32)
-
-# shuffle remaining
-X_temp = deepcopy(X_obs_windows)
-Y_temp = deepcopy(Y_obs_windows)
-Z_temp = deepcopy(Z_obs_windows)
-I_temp = deepcopy(I_obs_windows)
-del X_temp[test_ind]
-del Y_temp[test_ind]
-del Z_temp[test_ind]
-del I_temp[test_ind]
-shuffled_ind = torch.randperm(len(X_temp))
-
-# X
-X_train_obs, X_val_obs = split_data_group(X_temp,shuffled_ind)
-
-# Y
-Y_train_obs, Y_val_obs = split_data_group(Y_temp,shuffled_ind)
-
-# Z
-Z_train_obs, Z_val_obs = split_data_group(Z_temp,shuffled_ind)
-
-# I
-I_train_obs, I_val_obs = split_data_group(I_temp,shuffled_ind)
-
-### normalize sims
-for ind in range(len(X_sim_windows)):
-    if len(X_sim_windows[ind]) > 0:
-        site_temp = deepcopy(X_sim_windows[ind])
-        site_temp[site_temp == -9999] = np.nan
-        indicator = np.zeros((site_temp.shape[0], site_temp.shape[1], 1))  # zeros
-        nan_inds = np.where(np.isnan(site_temp[:,:,0]))
-        indicator[nan_inds] = np.nan
-        site_temp = np.append(site_temp, indicator, axis=-1)        
-        for v in range(num_input_vars):
-            site_temp[:,:,v] = (site_temp[:,:,v] - final_mean_X[v]) / final_sd_X[v]
-        site_temp = np.nan_to_num(site_temp, nan=-9999) 
-        X_sim_windows[ind] = torch.tensor(site_temp)
-
-        site_temp = deepcopy(Y_sim_windows[ind])
-        site_temp[site_temp == -9999] = np.nan
-        site_temp[:,:,0] = (site_temp[:,:,0] - final_mean_Y) / final_sd_Y
-        site_temp = np.nan_to_num(site_temp, nan=-9999) 
-        Y_sim_windows[ind] = torch.tensor(site_temp)
-
 ### train/val/test split
 def split_data_group(data0,shuffled_ind,train_frac=0.7,val_frac=0.3):
     sample_size = len(data0)
@@ -573,12 +309,12 @@ def split_data_group(data0,shuffled_ind,train_frac=0.7,val_frac=0.3):
     data_train = data_train.to(torch.float32)
     data_val = data_val.to(torch.float32)
     data_test = data_test.to(torch.float32)
-    return data_train, data_val, data_test
+    return data_train, data_val, data_test, 
 
 # shuffle remaining
-X_temp = list(X_sim_windows)
-Y_temp = list(Y_sim_windows)
-Z_temp = list(Z_sim_windows)
+X_temp = deepcopy(X_sim_windows)
+Y_temp = deepcopy(Y_sim_windows)
+Z_temp = deepcopy(Z_sim_windows)
 shuffled_ind = torch.randperm(len(X_temp))
 
 # X
@@ -596,14 +332,14 @@ n_l=2 #layer of gru
 loss_val_best = 500000
 best_epoch = 1000
 lr_adam=0.001 #orginal 0.0001
+bsz = 1000
 train_losses = []
 val_losses = []
 
 ### initialize model
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
 dropout = 0
-model = gru_w_cnn(num_input_vars,n_a,n_l,1,dropout)
+model = gru_w_cnn(len(X_vars_obs),n_a,n_l,1,dropout)
 model.to(device)
 params = list(model.parameters())
     
@@ -645,126 +381,276 @@ def load_tile(epoch):
     sample_size = len(new_tile)
     train_n=int(train_frac*sample_size)
     val_n=int(val_frac*sample_size)
-    #test_n=sample_size - train_n -val_n
     I_train_sim, I_val_sim, I_test_sim = [],[],[]
     for i in range(train_n):
         I_train_sim.append(new_tile[shuffled_ind[i]])
     for i in range(train_n, train_n+val_n):
         I_val_sim.append(new_tile[shuffled_ind[i]])
-    # for i in range(train_n+val_n, sample_size):
-    #     I_test_sim.append(new_tile[shuffled_ind[i]])
     I_train_sim = torch.cat(I_train_sim, dim=0)
     I_val_sim = torch.cat(I_val_sim, dim=0)
-    #I_test_sim = torch.cat(I_test_sim, dim=0)
     I_train_sim = I_train_sim.to(torch.float32)
     I_val_sim = I_val_sim.to(torch.float32)
-    # I_test_sim = I_test_sim.to(torch.float32)
     del new_tile
     gc.collect()
-
+    
     return I_train_sim, I_val_sim
 
-### train
-train_n = X_train_obs.size(0)
-val_n = X_val_obs.size(0)
-X_val_obs = X_val_obs.to(device)
-Y_val_obs = Y_val_obs.to(device)
-X_val_sim = X_val_sim.to(device)
-Y_val_sim = Y_val_sim.to(device)
-
+### pretrain
+train_n = X_train_sim.size(0)
+val_n = X_val_sim.size(0)
+test_n = X_test_sim.size(0)
+X_val = X_val_sim.to(device)
+Y_val = Y_val_sim.to(device)
 for epoch in range(maxepoch):
 
     # load image data
     I_train_sim, I_val_sim = load_tile(epoch)
-    I_val_sim = I_val_sim.to(device)    
+    I_val_sim = I_val_sim.to(device)
     
     train_loss=0.0
     val_loss=0.0
-    shuffled_b=torch.randperm(X_train_obs.size(0)) 
-    X_train_shuff_obs = X_train_obs[shuffled_b,:,:] 
-    Y_train_shuff_obs = Y_train_obs[shuffled_b,:,:]
-    I_train_shuff_obs = I_train_obs[shuffled_b,:,:]
     shuffled_b=torch.randperm(X_train_sim.size(0)) 
-    X_train_shuff_sim = X_train_sim[shuffled_b,:,:] 
-    Y_train_shuff_sim = Y_train_sim[shuffled_b,:,:]
-    I_train_shuff_sim = I_train_sim[shuffled_b,:,:]
-
+    X_train_shuff=X_train_sim[shuffled_b,:,:] 
+    Y_train_shuff=Y_train_sim[shuffled_b,:,:]
+    I_train_shuff=I_train_sim[shuffled_b,:,:]
+    
     # forward
     model.train()  # (switch on dropout; and optimization?)
     model.zero_grad()
-    total_batches = int(np.ceil(train_n/obs_per_batch))  # updating based on training size
-    for bb in range(total_batches):
-        if bb != (total_batches-1):
-            sbb_obs = bb*obs_per_batch
-            ebb_obs = (bb+1)*obs_per_batch
+    for bb in range(int(train_n/bsz)):
+        if bb != int(train_n/bsz)-1:
+            sbb = bb*bsz
+            ebb = (bb+1)*bsz
         else:
-            sbb_obs = bb*obs_per_batch
-            ebb_obs = train_n
-        #
-        sbb_sim = bb*sims_per_batch
-        ebb_sim = (bb+1)*sims_per_batch
-
+            sbb = bb*bsz
+            ebb = train_n
+        hidden = model.init_hidden(ebb-sbb).to(device)
         optimizer.zero_grad()
+        X_input = X_train_shuff[sbb:ebb, :, :].to(device)
+        Y_true = Y_train_shuff[sbb:ebb, :, :].to(device)
+        I_input = I_train_shuff[sbb:ebb].to(device)
+        Y_est, _ = model(I_input, X_input, hidden)
+        Y_est = Y_est[:,timesteps_per_year:(timesteps_per_year*2),:]  # chopping off the first year, that was spin-up
+        Y_true = Y_true[:,timesteps_per_year:(timesteps_per_year*2),:]
         
-        # obs        
-        hidden = model.init_hidden(ebb_obs-sbb_obs).to(device)
-        X_input = X_train_shuff_obs[sbb_obs:ebb_obs, :, :].to(device)
-        Y_true = Y_train_shuff_obs[sbb_obs:ebb_obs, :, :].to(device)
-        I_input = I_train_shuff_obs[sbb_obs:ebb_obs].to(device)
-        Y_est, _ = model(I_input, X_input, hidden)
-        Y_est = Y_est[:,timesteps_per_year:(timesteps_per_year*2),:]  # chopping off the first year, that was spin-up
-        Y_true = Y_true[:,timesteps_per_year:(timesteps_per_year*2),:]
-        loss_obs = mse_missing(Y_est, Y_true)
-
-        # sim
-        hidden = model.init_hidden(ebb_sim-sbb_sim).to(device)
-        X_input = X_train_shuff_sim[sbb_sim:ebb_sim, :, :].to(device)
-        Y_true = Y_train_shuff_sim[sbb_sim:ebb_sim, :, :].to(device)
-        I_input = I_train_shuff_sim[sbb_sim:ebb_sim].to(device)
-        Y_est, _ = model(I_input, X_input, hidden)
-        Y_est = Y_est[:,timesteps_per_year:(timesteps_per_year*2),:]  # chopping off the first year, that was spin-up
-        Y_true = Y_true[:,timesteps_per_year:(timesteps_per_year*2),:]
-        loss_sim = mse_missing(Y_est, Y_true)
-
-        # weight loss
-        loss = loss_obs*prop_loss_obs + loss_sim*prop_loss_sim
+        loss = mse_missing(Y_est, Y_true)
         hidden.detach_()
         loss.backward()
         optimizer.step()
         with torch.no_grad():
-            train_loss += loss.item()  # (NOT "bsz", since some batches aren't full)
-            
-    # finalize training loss         
-    train_loss /= total_batches
-    train_losses.append(train_loss)
-
+            train_loss += loss.item() * (ebb-sbb)  # (NOT "bsz", since some batches aren't full)
+    #
+    
     # validation
     model.eval()  # "testing" model, it switches off dropout and batch norm.    
     with torch.no_grad():
 
-        # obs
-        hidden = model.init_hidden(X_val_obs.shape[0]).to(device)
-        Y_val_pred_t, _ = model(I_val_obs, X_val_obs, hidden)
-        Y_val_pred_t = Y_val_pred_t[:,timesteps_per_year:(timesteps_per_year*2),:]  # chopping off the first year, that was spin-up        
-        loss_obs = mse_missing(Y_val_pred_t, Y_val_obs[:,timesteps_per_year:(timesteps_per_year*2),:])
+        # finalize training loss         
+        train_loss /= train_n
+        train_losses.append(train_loss)
         
-        # sim
-        hidden = model.init_hidden(X_val_sim.shape[0]).to(device)
-        Y_val_pred_t, _ = model(I_val_sim, X_val_sim, hidden)
-        Y_val_pred_t = Y_val_pred_t[:,timesteps_per_year:(timesteps_per_year*2),:]  # chopping off the first year, that was spin-up        
-        loss_sim = mse_missing(Y_val_pred_t, Y_val_sim[:,timesteps_per_year:(timesteps_per_year*2),:])
+        hidden = model.init_hidden(X_val.shape[0]).to(device)
+        Y_val_pred_t, _ = model(I_val_sim, X_val, hidden)
         
+        Y_val_pred_t = Y_val_pred_t[:,timesteps_per_year:(timesteps_per_year*2),:]  # chopping off the first year, that was spin-up
+        
+        loss = mse_missing(Y_val_pred_t, Y_val[:,timesteps_per_year:(timesteps_per_year*2),:])
+        val_loss += loss.item() * timesteps_per_year * X_val.shape[0]
         #
-        val_loss = loss_obs*prop_loss_obs + loss_sim*prop_loss_sim
+        val_loss /= (val_n*timesteps_per_year)        
         val_losses.append(val_loss)
 
         scheduler.step(val_loss)
         for param_group in optimizer.param_groups:
             print(f"Learning rate after epoch {epoch+1}: {param_group['lr']}")
-                    
+        
         # save model, update LR
-        if np.array(val_loss.cpu()) < loss_val_best:
-            loss_val_best=np.array(val_loss.cpu())
+        if val_loss < loss_val_best:
+            loss_val_best=np.array(val_loss)
+            best_epoch = epoch
+            torch.save({'epoch': epoch,
+                    'model_state_dict': model.state_dict(),
+                    'loss': train_loss,
+                    'los_val': val_loss,
+                    }, pretrain_path)   
+        print("finished training epoch", epoch+1, flush=True)
+	print("learning rate: ", optimizer.param_groups[0]["lr"], "train_loss: ", train_loss, "val_loss:",val_loss, "best_val_loss:",loss_val_best, flush=True)
+        path_fs = pretrain_path+'fs'
+        torch.save({'train_losses': train_losses,
+                    'val_losses': val_losses,
+                    'model_state_dict_fs': model.state_dict(),
+                    }, path_fs)  
+
+print("final train_loss:",train_loss,"val_loss:",val_loss,"val loss best:",loss_val_best, flush=True)
+del I_train_sim, I_val_sim
+gc.collect()
+
+
+
+#################
+### Fine tune ###
+#################
+
+def split_data_group(data0,shuffled_ind,train_frac=0.7,val_frac=0.3):
+    sample_size = len(data0)
+    train_n=int(train_frac*sample_size)
+    # val_n=int(val_frac*sample_size)
+    # test_n=sample_size - train_n -val_n
+    val_n = sample_size-train_n
+    test_n=0
+    data_train, data_val = [],[]
+    for i in range(0, train_n):
+        data_train.append(data0[shuffled_ind[i]])
+    for i in range(train_n,sample_size):
+        data_val.append(data0[shuffled_ind[i]])
+    data_train = torch.cat(data_train, dim=0)
+    data_val = torch.cat(data_val, dim=0)
+    data_train = data_train.to(torch.float32)
+    data_val = data_val.to(torch.float32)
+    return data_train,data_val
+
+### train/val/test split
+
+# separate single test site
+X_test = X_obs_windows[test_ind]
+Y_test = Y_obs_windows[test_ind]
+Z_test = Z_obs_windows[test_ind]
+M_test = M_obs_windows[test_ind]
+I_test = I_obs_windows[test_ind]
+if len(X_test) == 0:
+    print("\n\n\n\t test data empty\n\n\n")
+    sys.exit()
+
+# shuffle remaining
+X_temp = deepcopy(X_obs_windows)
+Y_temp = deepcopy(Y_obs_windows)
+Z_temp = deepcopy(Z_obs_windows)
+M_temp = deepcopy(M_obs_windows)
+I_temp = deepcopy(I_obs_windows)
+del X_temp[test_ind]
+del Y_temp[test_ind]
+del Z_temp[test_ind]
+del M_temp[test_ind]
+del I_temp[test_ind]
+shuffled_ind = torch.randperm(len(X_temp))
+
+# X
+X_train, X_val = split_data_group(X_temp,shuffled_ind)
+
+# Y
+Y_train, Y_val = split_data_group(Y_temp,shuffled_ind)
+
+# Z
+Z_train, Z_val = split_data_group(Z_temp,shuffled_ind)
+
+# M
+M_train, M_val = split_data_group(M_temp,shuffled_ind)
+
+# I
+I_train, I_val = split_data_group(I_temp,shuffled_ind)
+
+### initialize params for training
+n_a=8 #hidden state number
+n_l=2 #layer of gru
+loss_val_best = 500000
+best_epoch = 1000
+lr_adam=0.001 #orginal 0.0001
+bsz = 10
+train_losses = []
+val_losses = []
+
+### load pre-trained model 
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+dropout = 0
+
+with torch.no_grad():
+    checkpoint=torch.load(pretrain_path, map_location=device, weights_only=False)   
+    model = gru_w_cnn(len(X_vars_obs),n_a,n_l,1,dropout)
+    model.load_state_dict(checkpoint['model_state_dict'])
+    model.to(device) #too large for GPU, kif not enough, change to cpu
+
+params = list(model.parameters())
+
+# optimizer
+optimizer = optim.Adam(model.parameters(), lr=lr_adam) #add weight decay normally 1-9e-4
+scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=10, factor=0.5)
+maxepoch=100
+
+### finetune
+train_n = X_train.size(0)
+val_n = X_val.size(0)
+test_n = X_test.size(0)
+X_val = X_val.to(device)
+Y_val = Y_val.to(device)
+I_val = I_val.to(device)
+
+for epoch in range(maxepoch):
+    train_loss=0.0
+    val_loss=0.0
+    shuffled_b=torch.randperm(X_train.size(0)) 
+    X_train_shuff=X_train[shuffled_b,:,:] 
+    Y_train_shuff=Y_train[shuffled_b,:,:]
+    I_train_shuff=I_train[shuffled_b,:,:]
+    
+    # forward
+    model.train()  # (switch on dropout; and optimization?)
+    model.zero_grad()
+    for bb in range(int(train_n/bsz)):
+        if bb != int(train_n/bsz)-1:
+            sbb = bb*bsz
+            ebb = (bb+1)*bsz
+        else:
+            sbb = bb*bsz
+            ebb = train_n
+        hidden = model.init_hidden(ebb-sbb).to(device)
+        optimizer.zero_grad()
+        X_input = X_train_shuff[sbb:ebb, :, :].to(device)
+        Y_true = Y_train_shuff[sbb:ebb, :, :].to(device)
+        I_input = I_train_shuff[sbb:ebb].to(device)
+        
+        # augment images
+        B, T, C, H, W = I_input.shape
+        I_input = I_input.view(B * T, C, H, W)
+        I_input = torch.stack([random_flip_rotate(img) for img in I_input])
+        I_input = I_input.view(B, T, C, H, W)
+        
+        Y_est, _ = model(I_input, X_input, hidden)
+
+        Y_est = Y_est[:,timesteps_per_year:(timesteps_per_year*2),:]  # chopping off the first year, that was spin-up
+        Y_true = Y_true[:,timesteps_per_year:(timesteps_per_year*2),:]
+        
+        loss = mse_missing(Y_est, Y_true)
+
+        hidden.detach_()
+        loss.backward()
+        optimizer.step()
+        with torch.no_grad():
+            train_loss += loss.item() * (ebb-sbb)  # (NOT "bsz", since some batches aren't full)
+    
+    # validation
+    model.eval()  # "testing" model, it switches off dropout and batch norm.    
+    with torch.no_grad():
+
+        # finalize training loss         
+        train_loss /= train_n
+        train_losses.append(train_loss)
+        
+        hidden = model.init_hidden(X_val.shape[0]).to(device)
+        Y_val_pred_t, _ = model(I_val, X_val, hidden)
+        
+        Y_val_pred_t = Y_val_pred_t[:,timesteps_per_year:(timesteps_per_year*2),:]  # chopping off the first year, that was spin-up
+        
+        loss = mse_missing(Y_val_pred_t, Y_val[:,timesteps_per_year:(timesteps_per_year*2),:])
+        val_loss += loss.item() * timesteps_per_year * X_val.shape[0]
+        #
+        val_loss /= (val_n*timesteps_per_year)        
+        val_losses.append(val_loss)
+
+        scheduler.step(val_loss)
+        
+        # save model, update LR
+        if val_loss < loss_val_best:
+            loss_val_best=np.array(val_loss)
             best_epoch = epoch
             torch.save({'epoch': epoch,
                     'model_state_dict': model.state_dict(),
@@ -772,12 +658,13 @@ for epoch in range(maxepoch):
                     'los_val': val_loss,
                     }, finetune_path)   
         print("finished training epoch", epoch+1, flush=True)
-        print("learning rate: ", optimizer.param_groups[0]["lr"], "train_loss: ", train_loss, "val_loss:",val_loss, "best_val_loss:",loss_val_best, flush=True)
+	print("learning rate: ", optimizer.param_groups[0]["lr"], "train_loss: ", train_loss, "val_loss:",val_loss, "best_val_loss:",loss_val_best, flush=True)
         path_fs = finetune_path+'fs'
         torch.save({'train_losses': train_losses,
                     'val_losses': val_losses,
                     'model_state_dict_fs': model.state_dict(),
                     }, path_fs)  
+#
 print("final train_loss:",train_loss,"val_loss:",val_loss,"val loss best:",loss_val_best, flush=True)
 
 ### test
@@ -796,18 +683,12 @@ def check_results(total_b, I_test, check_xset, check_y1set, Y_stats):
         X_input = check_xset[sbb:ebb, :, :].to(device)
         Y_true = check_y1set[sbb:ebb, :, :].to(device)
         I_input = I_test[sbb:ebb, :, :].to(device)
-        Y1_pred_t, hidden = model(I_input, X_input, hidden)
+        Y1_pred_t, hidden = model(I_input, X_input,hidden)
 
         Y_true = Y_true[:,timesteps_per_year:(timesteps_per_year*2),:]  # chop off first year
         Y1_pred_t = Y1_pred_t[:,timesteps_per_year:(timesteps_per_year*2),:] 
-
-        # unnormalize before writing output, since every run has random sim IDs
-        Y_true = Z_norm_reverse(Y_true[:,:,0], [final_mean_Y, final_sd_Y])
-        Y1_pred_t = Z_norm_reverse(Y1_pred_t[:,:,0], [final_mean_Y, final_sd_Y])
         
-        #         
-        Y_true = torch.unsqueeze(Y_true, dim=-1)
-        Y1_pred_t = torch.unsqueeze(Y1_pred_t, dim=-1)
+        #            
         Y_true_all[sbb:ebb, :, :] = Y_true.to('cpu')  
         Y_pred_all[sbb:ebb, :, :] = Y1_pred_t.to('cpu')  
     #
@@ -820,7 +701,7 @@ def check_results(total_b, I_test, check_xset, check_y1set, Y_stats):
 
 with torch.no_grad():
     checkpoint=torch.load(finetune_path, map_location=torch.device('cpu'), weights_only=False)
-    model=gru_w_cnn(num_input_vars,n_a,n_l,1,dropout)
+    model=gru_w_cnn(len(X_vars_obs),n_a,n_l,1,dropout)
     model.load_state_dict(checkpoint['model_state_dict'])
     model.to(device) #too large for GPU, kif not enough, change to cpu
     model.eval()  # this is "testing" model, it switches off dropout and batch norm.

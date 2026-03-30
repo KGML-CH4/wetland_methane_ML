@@ -562,9 +562,7 @@ Z_train_sim, Z_val_sim, Z_test_sim = split_data_group(Z_temp,shuffled_ind)
 ### initialize params for training
 n_a=8 #hidden state number
 n_l=2 #layer of gru
-starttime=time.time()
 loss_val_best = 500000
-R2_best=0.5
 best_epoch = 1000
 lr_adam=0.001 #orginal 0.0001
 train_losses = []
@@ -721,12 +719,11 @@ def check_results(total_b, check_xset, check_y1set, Y_stats):
         Y_true_all[sbb:ebb, :, :] = Y_true.to('cpu')  
         Y_pred_all[sbb:ebb, :, :] = Y1_pred_t.to('cpu')  
     #
-    R2 = []
     loss = []    
     for varn in range(check_y1set.size(2)):
         loss.append(mse_missing(Y_pred_all[:,:,varn], Y_true_all[:,:,varn]).numpy())
 
-    return Y_pred_all, R2, loss
+    return Y_pred_all, loss
 
 
 with torch.no_grad():
