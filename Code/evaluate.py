@@ -301,30 +301,28 @@ mse_valid = np.sqrt(np.mean(ses_valid))
 mse_missing = np.sqrt(np.mean(ses_missing))
 
 ### bootstrap
-
-rng = np.random.default_rng(12345)   # fix seed for every model
+rng = np.random.default_rng(12345)   # shared seed across all models
+b = 10000  # don't change this, either.
 
 s = len(ses_valid)
-bs = []
-for i in range(1000):
+bs_valid = []
+for i in range(b):
     indices = rng.choice(s, size=s, replace=True)
     new_ses = np.array(ses_valid)[indices]
-    bs.append(np.sqrt(np.mean(new_ses)))
+    bs_valid.append(np.sqrt(np.mean(new_ses)))
 #
-bs.sort()
-lower_valid, upper_valid = np.percentile(bs, [2.5, 97.5])
-print(lower_valid, mse_valid, upper_valid)
+#lower_valid, upper_valid = np.percentile(bs_valid, [2.5, 97.5])
+np.save(config.fp_eval + "/bootstrap_valid", np.array(bs_valid))
 
 s = len(ses_missing)
-bs = []
-for i in range(1000):
+bs_missing = []
+for i in range(b):
     indices = rng.choice(s, size=s, replace=True)
     new_ses = np.array(ses_missing)[indices]
-    bs.append(np.sqrt(np.mean(new_ses)))
+    bs_missing.append(np.sqrt(np.mean(new_ses)))
 #
-bs.sort()
-lower_missing, upper_missing = np.percentile(bs, [2.5, 97.5])
-print(lower_missing, mse_missing, upper_missing)
+#lower_missing, upper_missing = np.percentile(bs_missing, [2.5, 97.5])
+np.save(config.fp_eval + "/bootstrap_missing", np.array(bs_missing))
 
 ### r2
 
@@ -391,4 +389,4 @@ legend_handles = [
 plt.legend(handles=legend_handles, loc='upper left', fontsize=12)
 
 plt.show()
-fig.savefig("evaluation.pdf", bbox_inches='tight')
+fig.savefig(config.fp_eval + '/scatter.pdf', bbox_inches='tight')
