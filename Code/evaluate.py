@@ -300,6 +300,32 @@ mse_valid = np.sqrt(np.mean(ses_valid))
 # including sites with missing months
 mse_missing = np.sqrt(np.mean(ses_missing))
 
+### bootstrap
+
+rng = np.random.default_rng(12345)   # fix seed for every model
+
+s = len(ses_valid)
+bs = []
+for i in range(1000):
+    indices = rng.choice(s, size=s, replace=True)
+    new_ses = np.array(ses_valid)[indices]
+    bs.append(np.sqrt(np.mean(new_ses)))
+#
+bs.sort()
+lower_valid, upper_valid = np.percentile(bs, [2.5, 97.5])
+print(lower_valid, mse_valid, upper_valid)
+
+s = len(ses_missing)
+bs = []
+for i in range(1000):
+    indices = rng.choice(s, size=s, replace=True)
+    new_ses = np.array(ses_missing)[indices]
+    bs.append(np.sqrt(np.mean(new_ses)))
+#
+bs.sort()
+lower_missing, upper_missing = np.percentile(bs, [2.5, 97.5])
+print(lower_missing, mse_missing, upper_missing)
+
 ### r2
 
 # complete sites
@@ -333,7 +359,7 @@ ax.set_ylim(lim_min,lim_max)
 x = np.linspace(lim_min,lim_max, 1000)
 ax.plot([lim_max*-2,lim_max*2], [lim_max*-2,lim_max*2], color='lightgrey',linestyle='--')
 ax.text(-10, 225,
-        'RMSE (complete sites) = %0.1f\nRMSE (all sites) = %0.1f' % (mse_valid, mse_missing),
+        'Valid sites RMSE = %0.1f\nAll sites RMSE = %0.1f' % (mse_valid, mse_missing),
         fontsize = 12, ha='left', va='top')
 
 # all sites (bottom layer)
