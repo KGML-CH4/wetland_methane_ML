@@ -23,17 +23,15 @@ days_per_month = config.days_per_month
 
 def fill_gaps(gappy_data):
     def interpolate_nan_time(arr):
-        # Interpolate each (i, j) pixel across time
         def interpolate_series(x):
             s = pd.Series(x)
             return s.interpolate(method='linear', limit_direction='both').fillna(method='bfill').fillna(method='ffill').to_numpy()  # tries birectional, but then relies on forward in case it's the first time point
         
         return np.apply_along_axis(interpolate_series, axis=0, arr=arr)
     def interpolate_nan_rows(arr):
-        # Interpolates each row independently
         return np.apply_along_axis(
             lambda row: pd.Series(row).interpolate(limit_direction='both').to_numpy(),
-            axis=1,  # axis=1 → rows
+            axis=1,
             arr=arr
         )
     def interpolate_nan_columns(arr):
