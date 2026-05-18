@@ -56,6 +56,7 @@ def random_flip_rotate(image):
     image = np.rot90(image, k=k, axes=(1, 2))
     return image
 
+
 ### subset for current rep                                                                         
 n = 24
 bands = ["sur_refl_b01",
@@ -114,6 +115,6 @@ for site in range(rep*n, (rep*n)+n):
         fp2 = folder + "/tile_" + str(i) + ".npy"
         np.save(fp2, tile)    
         
-    ## write sums
+    ## write
     fp3 = folder + "/sums.npy"
     np.save(fp3, sums)
